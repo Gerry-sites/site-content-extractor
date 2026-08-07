@@ -1,0 +1,11 @@
+export { runMigration } from "./pipeline/migrate.js";
+export { crawlSite } from "./crawler/index.js";
+export { detectPlatform } from "./detect/platform.js";
+export { listExtractors, getExtractor, registerExtractor } from "./extractors/registry.js";
+export type { PlatformExtractor, ExtractionContext } from "./extractors/types.js";
+export { generateMarkdown } from "./markdown/generate.js";
+export { downloadImages } from "./download/images.js";
+export { validateOutput } from "./validate/markdown.js";
+export { CliOptionsSchema } from "./types/config.js";
+export type { CliOptions, PlatformId } from "./types/config.js";
+export * from "./types/schemas.js";

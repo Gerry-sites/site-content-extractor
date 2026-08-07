@@ -1,0 +1,65 @@
+{
+  "name": "site-migrate",
+  "version": "0.1.0",
+  "description": "Migrate publicly accessible websites into clean Markdown and structured assets for Astro Content Collections",
+  "type": "module",
+  "bin": {
+    "site-migrate": "./dist/cli/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli/index.ts",
+    "start": "node dist/cli/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "keywords": [
+    "migration",
+    "static-site",
+    "astro",
+    "markdown",
+    "wix",
+    "crawler",
+    "playwright"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "cheerio": "^1.1.2",
+    "commander": "^14.0.0",
+    "js-yaml": "^4.1.0",
+    "p-limit": "^6.2.0",
+    "playwright": "^1.54.2",
+    "robots-parser": "^3.0.1",
+    "sharp": "^0.34.3",
+    "slugify": "^1.6.6",
+    "turndown": "^7.2.1",
+    "turndown-plugin-gfm": "^1.0.2",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.2.1",
+    "@types/turndown": "^5.0.5",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
