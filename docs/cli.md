@@ -40,7 +40,7 @@ site-migrate https://mysite.com --platform=wix
 site-migrate https://mysite.com --output ./migrated --resume
 ```
 
-`--resume` reuses `pages.json`, `html-index.json`, and already-downloaded images. It recrawls **only URLs that still have no cached HTML**. Markdown files not produced in this run are removed so a page cannot linger in both `pages/` and `portfolio/`.
+`--resume` reuses `pages.json`, `html-index.json`, and already-downloaded images. It recrawls **only URLs that still have no cached HTML**, and it keeps every previously cached URL in `pages.json` (resume cannot shrink the pack). If every discovered URL already has HTML, Playwright is not launched. Markdown files not produced in this run are removed so a page cannot linger in both `pages/` and `portfolio/`. After a successful write, migrate also writes `pruned/` inside the pack unless you pass `--skip-prune`.
 
 ### Skip images (content-only pass)
 
@@ -79,18 +79,41 @@ Defaults are `--concurrency 2` and `--timeout 90000`. `--timeout` maps to the Pl
 ### Import a pack into an Astro starter clone
 
 ```bash
-site-migrate import ./migrated --target /path/to/astro-clone --locale en
+site-migrate import ./migrated/pruned --target /path/to/astro-clone --locale en
 ```
+
+Migrate writes keepers to `<pack>/pruned` by default. Import that folder (or a `site-migrate prune` output) rather than the raw pack.
+
+Import copies every `/images/` path in frontmatter **and** the body, not only `heroImage` / `gallery`. The hero is omitted from `gallery`. Filling an existing portfolio or blog entry copies missing binaries, merges gallery paths, and keeps extra clone keys such as `medium` and `featured`. Protected slugs are skipped in **every** collection unless the matching overwrite flag is set, so `portfolio/home.md` does not land.
+
+New titles drop a ` | Sitename` suffix and title-case ALL CAPS Wix document titles (`CAVE` → `Cave`). Chrome-only or glued Wix descriptions (`DRAWINGCAVE 2018 This project…`) are replaced with the first real paragraph when one exists. New entries still dated `1970-01-01` pick up `## 2018` or `2014 - Ongoing` from the body, extracted headings, or a numeric slug such as `1993`. Standalone year headings are then removed from the body.
 
 | Flag                       | Default              | Description                               |
 | -------------------------- | -------------------- | ----------------------------------------- |
 | `--target <dir>`           | (required)           | Astro site with `src/content/config.ts`   |
 | `--locale <code>`          | `en`                 | Content locale folder                     |
-| `--protected-pages <list>` | `home,about,contact` | Page slugs that are not overwritten       |
-| `--overwrite-pages`        | off                  | Allow replacing protected pages           |
+| `--protected-pages <list>` | `home,about,contact` | Slugs skipped in every collection         |
+| `--overwrite-pages`        | off                  | Allow replacing protected **pages**       |
 | `--overwrite-entries`      | off                  | Replace existing portfolio/blog bodies    |
 | `--include-flagged`        | off                  | Copy flagged images into `public/images/` |
 | `--no-flag-inline-blog`    | off                  | Treat `inline-blog` flags as unflagged    |
+
+### Prune drafts and hub pages before import
+
+Migrate already writes `<pack>/pruned`. Use the standalone command to re-run heuristics, or pass `--skip-prune` on migrate and prune later:
+
+```bash
+site-migrate prune ./packs/client --output ./pruned-data
+site-migrate import ./packs/client/pruned --target /path/to/astro-clone --locale en
+```
+
+Drops Wix `copy-of-*` / `hs-*` drafts, placeholder “Click here to add your own text” pages, `home` / `about` / `contact` in every collection, Wix gallery-counter descriptions (`1/1`, `PAINTING1/1`), homepage/section hubs, and WordPress category indexes.
+
+A hub is dropped **even when it has a thumbnail gallery**: Wix/generic if there are 4+ in-content links and little prose; WordPress if there are 8+ links with little prose, or 40+ links. Facebook, Instagram, Twitter, and `mailto:` links do not count toward that threshold. A hero-only page with no gallery and no real paragraph is dropped as thin chrome.
+
+Keepers are cleaned before write: `Title | Sitename` is stripped, ALL CAPS titles are title-cased, glued Wix descriptions are replaced with body prose, year headings and numeric slugs fill `1970-01-01`, the hero is omitted from `gallery`, leftover portfolio body images are promoted into `gallery`, and parent-nav headings that are only a markdown link are removed. Image-heavy Wix work pages are moved into `portfolio/`. Chrome and other-host images are not copied.
+
+After extractor changes, re-run `site-migrate prune` on an existing pack so `<pack>/pruned` matches current heuristics. Do not import `pruned-data/` leftovers from an older run.
 
 ## Implemented platforms
 
@@ -129,6 +152,7 @@ Other enum values (`ghost`, `framer`, …) are reserved for future plugins — s
 | `images-manifest.json`            | Image download resume support                                 |
 | `report.md`                       | Human-readable summary (Coverage + Review)                    |
 | `html/` / `html-index.json`       | Cached hydrated HTML for `--resume`                           |
+| `pruned/`                         | Import-ready keepers (unless `--skip-prune`)                  |
 | `image-review.json`               | Flagged chrome / other-host / title-name / inline-blog images |
 | `astro-content.config.example.ts` | Astro collections starter                                     |
 

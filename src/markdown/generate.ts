@@ -3,6 +3,16 @@ import { htmlToMarkdown } from "./turndown.js";
 import { serializeMarkdownFile } from "./frontmatter.js";
 import { MISSING_DATE, packFolder, type PackFolder } from "../pack/paths.js";
 import { stripSkippableImages, upgradeMediaUrl } from "../media/urls.js";
+import {
+  cleanMarkdownBody,
+  polishDescription,
+  polishTitle,
+  stripLocalImageEmbeds,
+  stripTitleSuffix,
+  stripYearHeadings,
+  yearFromHeadings,
+  localImagePaths,
+} from "./cleanup.js";
 
 export type MarkdownResult = {
   filename: string;
@@ -18,25 +28,37 @@ function applyImagePaths(text: string, imagePaths: ImagePathMap): string {
   for (const [remote, local] of imagePaths) {
     next = next.split(remote).join(local);
   }
-  return next.replace(/https?:\/\/[^\s"'<>]+/g, (url) => {
+  next = next.replace(/https?:\/\/[^\s"'<>]+/g, (url) => {
     return imagePaths.get(url) || imagePaths.get(upgradeMediaUrl(url)) || url;
   });
+  return next.replace(/(\/images\/[^\s"'<>?]+)\?[^"'<>)\s]*/g, "$1");
 }
 
-function fallbackDescription(page: ExtractedPage): string {
-  const fromField = page.description?.replace(/\s+/g, " ").trim();
-  if (fromField) return fromField;
-  const fromBody = page.textContent?.replace(/\s+/g, " ").trim();
-  if (fromBody) return fromBody.slice(0, 180);
-  return page.title || "Untitled";
-}
-
-function fallbackDate(page: ExtractedPage): string {
+function fallbackDate(page: ExtractedPage, body: string): string {
   const raw = page.date || page.blog?.date;
-  if (!raw) return MISSING_DATE;
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return MISSING_DATE;
-  return parsed.toISOString().slice(0, 10);
+  if (raw) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  }
+  const headingBlob = (page.headings ?? []).map((heading) => `## ${heading}`).join("\n");
+  const fromHeading =
+    yearFromHeadings(body) ||
+    yearFromHeadings(headingBlob) ||
+    yearFromHeadings(page.textContent ?? "");
+  if (fromHeading) return fromHeading;
+  if (/^\d{4}$/.test(page.slug)) return `${page.slug}-01-01`;
+  return MISSING_DATE;
+}
+
+function uniqueLocals(paths: Array<string | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const src of paths) {
+    if (!src || seen.has(src)) continue;
+    seen.add(src);
+    out.push(src);
+  }
+  return out;
 }
 
 export function generateMarkdown(
@@ -49,53 +71,64 @@ export function generateMarkdown(
 
   let body = htmlToMarkdown(html);
   body = applyImagePaths(body, imagePaths);
+  body = cleanMarkdownBody(body, stripTitleSuffix(page.title || ""));
 
   const folder: PackFolder = packFolder(page.kind, page.isBlogPost, options.skipBlog);
 
-  const galleryLocals =
-    page.galleries[0]?.images
-      .map((src) => imagePaths.get(src) || imagePaths.get(upgradeMediaUrl(src)))
-      .filter((x): x is string => Boolean(x)) ?? [];
+  const galleryLocals = uniqueLocals(
+    (page.galleries ?? []).flatMap((gallery) =>
+      gallery.images.map((src) => imagePaths.get(src) || imagePaths.get(upgradeMediaUrl(src))),
+    ),
+  );
+  const includeBodyImages =
+    galleryLocals.length > 0 || page.kind === "gallery" || page.kind === "portfolio";
+  const allLocals = includeBodyImages
+    ? uniqueLocals([...galleryLocals, ...localImagePaths(body)])
+    : galleryLocals;
 
-  if (galleryLocals.length >= 3) {
-    for (const local of galleryLocals) {
-      const escaped = local.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      body = body.replace(new RegExp(`!\\[[^\\]]*\\]\\(${escaped}\\)\\n*`, "g"), "");
-    }
-    body = body.replace(/\n{3,}/g, "\n\n").trim() + "\n";
+  const heroLocal =
+    (page.heroImage &&
+      (imagePaths.get(page.heroImage) || imagePaths.get(upgradeMediaUrl(page.heroImage)))) ||
+    allLocals[0];
+  const galleryForMatter = allLocals.filter((src) => src !== heroLocal);
+
+  if (allLocals.length >= 1) {
+    body = stripLocalImageEmbeds(body, allLocals);
   }
 
   if (page.videos.length) {
-    body += "\n## Videos\n\n";
+    body += "\n\n## Videos\n\n";
     for (const video of page.videos) {
       const label = video.title || video.provider || "Video";
       body += `- [${label}](${video.src})\n`;
     }
-    body += "\n";
   }
 
   if (page.files.length) {
-    body += "\n## Downloads\n\n";
+    body += "\n\n## Downloads\n\n";
     for (const file of page.files) {
       body += `- [${file.text || file.filename || "Download"}](${file.href})\n`;
     }
-    body += "\n";
   }
 
-  const heroLocal =
-    (page.heroImage && (imagePaths.get(page.heroImage) || imagePaths.get(upgradeMediaUrl(page.heroImage)))) ||
-    undefined;
+  body = body.replace(/\n{3,}/g, "\n\n").trim();
 
+  const title = polishTitle(page.title || "Untitled");
   const frontmatter: Frontmatter = {
-    title: page.title || "Untitled",
-    description: fallbackDescription(page),
+    title,
+    description: polishDescription(
+      page.description,
+      body,
+      title,
+    ),
     slug: page.slug,
     sourceUrl: page.url,
     heroImage: heroLocal || undefined,
   };
 
   if (folder !== "pages") {
-    frontmatter.date = fallbackDate(page);
+    frontmatter.date = fallbackDate(page, body);
+    body = stripYearHeadings(body);
   }
 
   if (page.isBlogPost && page.blog && !options.skipBlog) {
@@ -104,9 +137,9 @@ export function generateMarkdown(
     frontmatter.tags = page.blog.tags.length ? page.blog.tags : undefined;
   }
 
-  if (galleryLocals.length >= 1) {
-    frontmatter.gallery = galleryLocals;
-    if (!frontmatter.heroImage) frontmatter.heroImage = galleryLocals[0];
+  if (galleryForMatter.length >= 1) {
+    frontmatter.gallery = galleryForMatter;
+    if (!frontmatter.heroImage) frontmatter.heroImage = galleryForMatter[0];
   }
 
   const content = serializeMarkdownFile(frontmatter, body);

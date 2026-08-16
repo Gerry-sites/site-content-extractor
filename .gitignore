@@ -2,6 +2,7 @@ node_modules/
 dist/
 output/
 packs/
+pruned-data/
 coverage/
 *.log
 .env

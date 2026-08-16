@@ -25,9 +25,10 @@ src/
 2. **Detect** — HTML/URL signals choose a platform extractor (`--platform=auto`).
 3. **Extract** — The selected extractor returns structured page content (title, HTML body, images, galleries, blog meta).
 4. **Download** — Referenced images are fetched, hash-deduplicated, and thumbnailed.
-5. **Markdown** — HTML is converted to human-editable Markdown with YAML frontmatter.
+5. **Markdown** — HTML is converted to human-editable Markdown with YAML frontmatter. Titles drop a ` | Sitename` suffix and ALL CAPS document titles are title-cased, chrome-only or glued descriptions are replaced, year headings fill missing dates, and gallery/portfolio locals are listed in frontmatter (hero omitted from `gallery`) rather than left as body embeds.
 6. **Assets** — `navigation.json`, `metadata.json`, `sitemap.json` are written.
 7. **Report + validate** — `report.md` summarizes the run; validators check titles, slugs, and image refs.
+8. **Prune** — unless `--skip-prune`, keepers are copied to `<pack>/pruned` (drafts, hubs, protected slugs, gallery-counter chrome, and hero-only thin pages dropped). Import that folder, not the raw pack.
 
 ## Plugin boundary
 

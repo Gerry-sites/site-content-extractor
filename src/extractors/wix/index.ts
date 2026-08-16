@@ -63,6 +63,10 @@ export const wixExtractor: PlatformExtractor = {
   },
 
   async extractPage(ctx): Promise<ExtractedPage> {
+    const $raw = loadDocument(ctx.html);
+    const preChromeImages = extractImages($raw, ctx.url);
+    const preChromeGalleries = detectGalleries($raw, ctx.url);
+
     const $ = loadDocument(ctx.html);
     const title = extractTitle($);
     const description = extractDescription($);
@@ -128,7 +132,7 @@ export const wixExtractor: PlatformExtractor = {
     const images = extractImages($main, ctx.url);
     const pageImages = extractImages($, ctx.url);
     const mergedImages = [...images];
-    for (const img of pageImages) {
+    for (const img of [...pageImages, ...preChromeImages]) {
       if (!mergedImages.some((m) => m.src === img.src)) mergedImages.push(img);
     }
 
@@ -138,7 +142,7 @@ export const wixExtractor: PlatformExtractor = {
     const galleries = detectGalleries($main, ctx.url);
     // Wix pro-gallery often outside cleaned main
     const pageGalleries = detectGalleries($, ctx.url);
-    for (const g of pageGalleries) {
+    for (const g of [...pageGalleries, ...preChromeGalleries]) {
       if (!galleries.some((x) => x.images[0] === g.images[0])) {
         galleries.push(g);
       }

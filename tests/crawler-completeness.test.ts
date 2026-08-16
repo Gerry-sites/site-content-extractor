@@ -5,6 +5,7 @@ import path from "node:path";
 import { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import { runMigration } from "../src/pipeline/migrate.js";
+import { exists } from "../src/utils/fs.js";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -44,7 +45,9 @@ function startMiniSite(): Promise<{ origin: string; close: () => Promise<void> }
     }
     if (url === "/about") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(html(`<main><h1>About</h1><p>Studio biography lives here for extraction.</p></main>`));
+      res.end(
+        html(`<main><h1>About</h1><p>Studio biography lives here for extraction.</p></main>`),
+      );
       return;
     }
     if (url === "/works") {
@@ -126,6 +129,7 @@ describe("crawler completeness fixture", () => {
         generateResponsive: false,
         jsonExport: false,
         userAgent: "site-migrate-test",
+        skipPrune: false,
       });
 
       const pagesJson = JSON.parse(await readFile(path.join(output, "pages.json"), "utf8")) as {
@@ -156,6 +160,7 @@ describe("crawler completeness fixture", () => {
       expect(result.report.coverage?.missingHtml.some((u) => u.endsWith("/contact"))).toBe(false);
       expect(result.report.coverage?.missingHtml.some((u) => u.endsWith("/about"))).toBe(false);
       expect(result.report.coverage?.missingHtml.some((u) => u.endsWith("/works"))).toBe(false);
+      expect(await exists(path.join(output, "pruned", "prune-report.json"))).toBe(true);
     } finally {
       await close();
     }

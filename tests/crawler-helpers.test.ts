@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyCurrentSrc, injectResourceImages, isLoadMoreLabel } from "../src/crawler/hydrate.js";
 import { extraSeedUrls, discoveryFeedUrls, isLowValueCrawlUrl } from "../src/crawler/seeds.js";
+import { rememberResumePages, recrawlQueue, shouldRecrawl } from "../src/crawler/resume.js";
 import { extractUrlsFromFeedXml } from "../src/crawler/feeds.js";
 import { discoverWordpressPostUrls } from "../src/crawler/wordpress-rest.js";
 
@@ -46,18 +47,93 @@ describe("seed URLs", () => {
       isLowValueCrawlUrl("https://blog.example.com/2015/12/30/about-albi-museum/www-albi-03"),
     ).toBe(true);
     expect(isLowValueCrawlUrl("https://blog.example.com/2015/12/30/about-albi-museum")).toBe(false);
-    expect(
-      isLowValueCrawlUrl("https://blog.example.com/wp-content/uploads/2020/01/dish.jpg"),
-    ).toBe(true);
+    expect(isLowValueCrawlUrl("https://blog.example.com/wp-content/uploads/2020/01/dish.jpg")).toBe(
+      true,
+    );
     expect(isLowValueCrawlUrl("https://blog.example.com/?pushpress=hub")).toBe(true);
     expect(isLowValueCrawlUrl("https://blog.example.com/?attachment_id=99")).toBe(true);
     expect(isLowValueCrawlUrl("https://blog.example.com/photo/attachment/photo-file")).toBe(true);
+    expect(isLowValueCrawlUrl("https://blog.example.com/osd.xml")).toBe(true);
+    expect(isLowValueCrawlUrl("https://blog.example.com/feed.json")).toBe(true);
+    expect(isLowValueCrawlUrl("https://blog.example.com/favicon.ico")).toBe(true);
   });
 
   it("lists feed discovery URLs on the seed origin", () => {
     const feeds = discoveryFeedUrls("https://blog.example.com/posts");
     expect(feeds.every((url) => url.startsWith("https://blog.example.com"))).toBe(true);
     expect(feeds.some((url) => url.endsWith("/feed"))).toBe(true);
+  });
+});
+
+describe("resume discovery", () => {
+  it("keeps cached URLs including low-value ones and HTML-only keys", () => {
+    const discovered = new Map();
+    rememberResumePages(
+      discovered,
+      [
+        {
+          url: "https://studio.example.com/",
+          normalizedUrl: "https://studio.example.com",
+          depth: 0,
+          source: "seed",
+        },
+        {
+          url: "https://studio.example.com/osd.xml",
+          normalizedUrl: "https://studio.example.com/osd.xml",
+          depth: 1,
+          source: "link",
+        },
+        {
+          url: "https://studio.example.com/works",
+          normalizedUrl: "https://studio.example.com/works",
+          depth: 1,
+          source: "link",
+        },
+      ],
+      [
+        "https://studio.example.com",
+        "https://studio.example.com/works",
+        "https://studio.example.com/portraits",
+      ],
+    );
+
+    expect(discovered.size).toBe(4);
+    expect(discovered.has("https://studio.example.com/osd.xml")).toBe(true);
+    expect(discovered.has("https://studio.example.com/portraits")).toBe(true);
+
+    const htmlByUrl = new Map([
+      ["https://studio.example.com", "<p>home</p>"],
+      ["https://studio.example.com/works", "<p>works</p>"],
+      ["https://studio.example.com/portraits", "<p>portraits</p>"],
+    ]);
+    expect(shouldRecrawl("https://studio.example.com/osd.xml", htmlByUrl)).toBe(false);
+    expect(shouldRecrawl("https://studio.example.com/works", htmlByUrl)).toBe(false);
+    expect(recrawlQueue(discovered, htmlByUrl)).toEqual([]);
+  });
+
+  it("queues only URLs that still have no cached HTML", () => {
+    const discovered = new Map();
+    rememberResumePages(
+      discovered,
+      [
+        {
+          url: "https://studio.example.com/works",
+          normalizedUrl: "https://studio.example.com/works",
+          depth: 1,
+          source: "link",
+        },
+        {
+          url: "https://studio.example.com/about",
+          normalizedUrl: "https://studio.example.com/about",
+          depth: 1,
+          source: "seed",
+        },
+      ],
+      ["https://studio.example.com/works"],
+    );
+    const htmlByUrl = new Map([["https://studio.example.com/works", "<p>works</p>"]]);
+    const queue = recrawlQueue(discovered, htmlByUrl);
+    expect(queue.map((item) => item.url)).toEqual(["https://studio.example.com/about"]);
   });
 });
 

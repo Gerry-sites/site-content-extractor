@@ -8,7 +8,6 @@ const REMOVE_SELECTORS = [
   "iframe[src*='googletagmanager']",
   "iframe[src*='facebook.com/plugins']",
   "iframe[src*='doubleclick']",
-  "[aria-hidden='true']",
   ".cookie-banner",
   ".cookie-consent",
   "#cookie-banner",
@@ -64,6 +63,19 @@ export function removeChrome($: cheerio.CheerioAPI): void {
   for (const selector of REMOVE_SELECTORS) {
     $(selector).remove();
   }
+  // Wix Pro Gallery hides off-screen tiles with aria-hidden. Keep those imgs.
+  $("[aria-hidden='true']").each((_, el) => {
+    const node = $(el);
+    const srcs = node
+      .find("img")
+      .toArray()
+      .map((img) => $(img).attr("src") || $(img).attr("data-src") || "");
+    const hasContentImage = srcs.some(
+      (src) => src && !src.startsWith("data:") && !/\/v1\/fill\/w_1[0-9],h_1[0-9]/.test(src),
+    );
+    if (hasContentImage) return;
+    node.remove();
+  });
 }
 
 export function selectMainContent($: cheerio.CheerioAPI): cheerio.Cheerio<AnyNode> {

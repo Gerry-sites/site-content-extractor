@@ -8,7 +8,7 @@ const WIX_CHROME_IDS = new Set([
   "fdcfaba150fc427da298a00cb09d91c1.png",
 ]);
 
-const WIX_MEDIA_ID = /([a-z0-9]+_[a-z0-9]+~mv2(?:_d_\d+_\d+_s_\d+)?\.(?:jpg|jpeg|png|webp))/i;
+const WIX_MEDIA_ID = /([a-z0-9]+_[a-z0-9]+~mv2(?:_d_\d+_\d+_s_[\d_]+)?\.(?:jpg|jpeg|png|webp))/i;
 
 const SIZE_QUERY_KEYS = ["w", "h", "crop", "resize", "fit", "quality", "q", "ssl", "strip"];
 
@@ -19,6 +19,9 @@ export function wixMediaId(urlOrId: string): string | undefined {
 
 export function looksLikeImageUrl(url: string): boolean {
   if (!url || url.startsWith("data:")) return false;
+  if (/\.(mp4|webm|mov|m4v|m3u8)(?:$|\?)/i.test(url) || /video\.wixstatic/i.test(url)) {
+    return false;
+  }
   if (
     /static\.wixstatic\.com\/media|filesusr\.com|squarespace\.com|sqspcdn\.com|wp-content\/uploads|\.wp\.com\//.test(
       url,
@@ -39,6 +42,7 @@ export function isSkippableAsset(url: string): boolean {
   }
   if (/\/v1\/fill\/w_1[0-9],h_1[0-9]/.test(url)) return true;
   if (/favicon|pfavico/i.test(url)) return true;
+  if (/static\.wixstatic\.com/i.test(url) && /[?&]token=/.test(url)) return true;
   return false;
 }
 

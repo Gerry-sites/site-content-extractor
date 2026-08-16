@@ -96,6 +96,7 @@ site-migrate import <pack...> --target <astro-clone>
 | `--overwrite`                  | off               | Replace existing output directory                                  |
 | `--skip-images`                | off               | Skip image downloads                                               |
 | `--skip-blog`                  | off               | Do not classify pages as blog posts                                |
+| `--skip-prune`                 | off               | Do not write `<pack>/pruned` after migrate                         |
 | `--no-respect-robots`          | off               | Ignore robots.txt                                                  |
 | `--concurrency <n>`            | `2`               | Parallel crawl/download workers                                    |
 | `--responsive-images`          | off               | Generate width variants with Sharp                                 |
@@ -105,10 +106,16 @@ site-migrate import <pack...> --target <astro-clone>
 ### Import into an Astro clone
 
 ```bash
-site-migrate import ./output --target /path/to/astro-clone --locale en
+site-migrate import ./output/pruned --target /path/to/astro-clone --locale en
 ```
 
-`--target` is required. Protected pages (`home`, `about`, `contact`) are not overwritten unless `--overwrite-pages`. Flagged images stay out of `public/images/` unless `--include-flagged`.
+`--target` is required. Import `<pack>/pruned`, not the raw crawl. Protected slugs (`home`, `about`, `contact`) are skipped in every collection unless `--overwrite-pages` / `--overwrite-entries`. Flagged images stay out of `public/images/` unless `--include-flagged`. Body `/images/` refs are copied as well as `heroImage` / `gallery`. ALL CAPS titles are title-cased; glued Wix descriptions are replaced with body prose.
+
+Migrate writes keepers to `<pack>/pruned` by default. Section hubs are dropped even when they have a thumbnail gallery. Re-run heuristics after extractor changes with:
+
+```bash
+site-migrate prune ./packs/client --output ./pruned-data
+```
 
 ## Documentation
 

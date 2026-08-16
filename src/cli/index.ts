@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { CliOptionsSchema, ImportOptionsSchema } from "../types/config.js";
+import { CliOptionsSchema, ImportOptionsSchema, PruneOptionsSchema } from "../types/config.js";
 import { runMigration } from "../pipeline/migrate.js";
 import { importPacks } from "../import/astro.js";
+import { prunePack } from "../pack/prune.js";
 
 const program = new Command();
 
@@ -38,6 +39,7 @@ program
   .option("--overwrite", "Overwrite existing output directory", false)
   .option("--skip-images", "Skip image downloading", false)
   .option("--skip-blog", "Do not treat pages as blog posts", false)
+  .option("--skip-prune", "Do not write a pruned/ copy after migrate", false)
   .option(
     "--platform <name>",
     "Platform extractor: auto|generic|wix|webflow|squarespace|wordpress|...",
@@ -63,6 +65,7 @@ program
       overwrite: opts.overwrite,
       skipImages: opts.skipImages,
       skipBlog: opts.skipBlog,
+      skipPrune: opts.skipPrune,
       platform: opts.platform,
       respectRobots: opts.respectRobots,
       concurrency: opts.concurrency,
@@ -141,6 +144,49 @@ program
       console.log(`  Flagged skipped:  ${summary.skippedFlaggedImages}`);
       for (const item of summary.added) console.log(`    + ${item}`);
       for (const item of summary.skippedProtected) console.log(`    ~ ${item}`);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("prune")
+  .description("Copy only real, non-draft pack entries into a pruned output folder")
+  .argument("<packs...>", "Pack output directories")
+  .option("-o, --output <dir>", "Parent directory for pruned packs", "pruned-data")
+  .action(async (packs: string[], opts: Record<string, unknown>) => {
+    const parsed = PruneOptionsSchema.safeParse({
+      packs,
+      output: opts.output,
+    });
+    if (!parsed.success) {
+      console.error("Invalid prune options:");
+      for (const issue of parsed.error.issues) {
+        console.error(`  - ${issue.path.join(".")}: ${issue.message}`);
+      }
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      for (const pack of parsed.data.packs) {
+        const name =
+          pack
+            .replace(/[\\/]+$/, "")
+            .split(/[\\/]/)
+            .pop() || "pack";
+        const dest = `${parsed.data.output.replace(/[\\/]+$/, "")}/${name}`;
+        const summary = await prunePack(pack, dest);
+        console.log(`Pruned ${pack} → ${summary.output}`);
+        console.log(`  Platform: ${summary.platform}`);
+        console.log(`  Kept:     ${summary.kept.length}`);
+        console.log(`  Dropped:  ${summary.dropped.length}`);
+        console.log(
+          `  Images:   ${summary.imagesCopied} copied, ${summary.imagesSkippedFlagged} flagged skipped`,
+        );
+        for (const row of summary.dropped) console.log(`    - ${row.from} (${row.reason})`);
+      }
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
       process.exitCode = 1;

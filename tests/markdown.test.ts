@@ -128,12 +128,78 @@ describe("markdown generation", () => {
     const result = generateMarkdown(page, imagePaths);
     const { frontmatter } = parseFrontmatter(result.content);
     expect(frontmatter.gallery).toEqual([
-      "/images/portfolio/gallery-hero.jpg",
       "/images/portfolio/gallery-2.jpg",
       "/images/portfolio/gallery-3.jpg",
     ]);
     expect(frontmatter.heroImage).toBe("/images/portfolio/gallery-hero.jpg");
     expect(frontmatter.date).toBe("1970-01-01");
     expect(result.relativePath).toBe("portfolio/gallery.md");
+  });
+
+  it("strips WordPress size queries from already-local image paths", () => {
+    const page: ExtractedPage = {
+      url: "https://blog.example.com/dish",
+      title: "Dish",
+      description: "A recipe",
+      slug: "dish",
+      headings: [],
+      htmlContent: '<p>Hi</p><img src="/images/blog/dish.jpg?w=768&ssl=1" alt="Dish" />',
+      images: [{ src: "/images/blog/dish.jpg?w=768&ssl=1", alt: "Dish", role: "content" }],
+      links: [],
+      videos: [],
+      files: [],
+      galleries: [],
+      isBlogPost: true,
+      kind: "blog",
+    };
+    const result = generateMarkdown(page, new Map());
+    expect(result.content).toContain("/images/blog/dish.jpg");
+    expect(result.content).not.toMatch(/\/images\/blog\/dish\.jpg\?/);
+    expect(result.content).not.toContain("w=768");
+  });
+
+  it("puts leftover gallery images in frontmatter and strips Wix chrome from the body", () => {
+    const page: ExtractedPage = {
+      url: "https://studio.example.com/printmaking",
+      title: "PRINTMAKING | Studio",
+      description: "PRINTMAKING MOVEMENT I This project on Movement started soon after returning from a trip.",
+      slug: "printmaking",
+      headings: [],
+      htmlContent: `<h1><a href="/">PRINTMAKING</a></h1><h2>2016</h2><p>The Movement project started after a trip.</p><img src="https://cdn.example.com/18.jpg" alt="" />`,
+      images: [{ src: "https://cdn.example.com/18.jpg", role: "content" }],
+      links: [],
+      videos: [],
+      files: [],
+      galleries: [
+        {
+          images: ["https://cdn.example.com/hero.jpg", "https://cdn.example.com/1.jpg"],
+        },
+      ],
+      isBlogPost: false,
+      kind: "gallery",
+      heroImage: "https://cdn.example.com/hero.jpg",
+    };
+    const result = generateMarkdown(
+      page,
+      new Map([
+        ["https://cdn.example.com/hero.jpg", "/images/portfolio/printmaking-hero.jpg"],
+        ["https://cdn.example.com/1.jpg", "/images/portfolio/printmaking-1.jpg"],
+        ["https://cdn.example.com/18.jpg", "/images/portfolio/printmaking-18.jpg"],
+      ]),
+    );
+    const { frontmatter, body } = parseFrontmatter(result.content);
+    expect(frontmatter.title).toBe("Printmaking");
+    expect(frontmatter.heroImage).toBe("/images/portfolio/printmaking-hero.jpg");
+    expect(frontmatter.gallery).toEqual([
+      "/images/portfolio/printmaking-1.jpg",
+      "/images/portfolio/printmaking-18.jpg",
+    ]);
+    expect(frontmatter.date).toBe("2016-01-01");
+    expect(frontmatter.description).toContain("The Movement project started after a trip");
+    expect(frontmatter.description).not.toMatch(/^PRINTMAKING/);
+    expect(body).toContain("The Movement project started after a trip");
+    expect(body).not.toContain("## 2016");
+    expect(body).not.toContain("printmaking-18.jpg");
+    expect(body).not.toMatch(/^# \[PRINTMAKING\]/m);
   });
 });

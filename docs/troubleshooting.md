@@ -49,7 +49,7 @@ The crawl finished but Markdown validation or **coverage** found errors (missing
 
 Wix hydrates late. The crawler waits for `networkidle`, then `--settle-ms` (default 2500), clicks Load more, scrolls, and waits until image counts stabilize. Increase `--settle-ms` or `--timeout` for stubborn Pro Galleries. Image fetches send a `Referer` of the seed origin.
 
-`--resume` only recrawls pages that still have no HTML in `html-index.json`.
+`--resume` only recrawls pages that still have no HTML in `html-index.json`. Cached URLs stay in `pages.json`. If every discovered URL already has HTML, the browser is not launched. Video URLs and tokenized Wix storefront assets are not coverage holes.
 
 ## Sharp install issues on Windows
 
@@ -62,3 +62,25 @@ npm rebuild sharp
 ## `--platform=ghost` (or other reserved id) fails
 
 Those ids are reserved in the CLI schema but do not have registered extractors yet. Use `--platform=auto` or an implemented value (`generic`, `wix`, `wordpress`, `webflow`, `squarespace`), or [add a plugin](plugins.md).
+
+## Import copied pages you did not want
+
+Import `<pack>/pruned`, not the raw crawl. The raw pack still contains `copy-of-*` / `hs-*` drafts and section hubs. After extractor changes, re-run `site-migrate prune` so an older `pruned/` or `pruned-data/` folder is not what you import.
+
+`home`, `about`, and `contact` are dropped at prune and skipped by import in every collection. The clone template for those slugs stays unless you pass `--overwrite-pages` (pages) or `--overwrite-entries` (portfolio/blog).
+
+## Body images 404 in the clone
+
+Current import copies every `/images/` path in the Markdown body as well as `heroImage` / `gallery`. If a WordPress pack still has `?w=` on local paths, re-migrate (or re-prune) so queries are stripped before import. Leftover remote thumbs are a coverage hole in `report.md`, not an import skip.
+
+## Portfolio hubs landed as works
+
+Wix section menus with a thumbnail grid used to survive prune. Current prune drops them when there are 4+ in-content links and little prose, even if `gallery` has 3+ images. Re-prune the pack. Facebook / Instagram / `mailto:` links do not count, so a hero-only page with social icons used to survive. Current prune drops that as `thin-chrome` unless there is a real paragraph or extra gallery images.
+
+## Dates are 1970-01-01
+
+Wix often has no article date. Generate and prune fill `1970-01-01` from a `## 2018` / `2014 - Ongoing` heading or a numeric slug (`1993`). Pages with neither stay on the sentinel date. Filling an existing clone entry does not overwrite the clone’s date.
+
+## Titles are ALL CAPS or `Title | Sitename`
+
+The ` | Sitename` suffix is stripped and ALL CAPS titles are title-cased (`CAVE` → `Cave`). The tool does not rewrite mixed-case titles. Chrome-only descriptions and Wix concatenations (`PAINTINGAMPHORAE Work made…`) are replaced with the first real body paragraph.

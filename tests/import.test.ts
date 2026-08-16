@@ -81,6 +81,108 @@ describe("Astro import", () => {
     const imported = await readFile(path.join(target, "src/content/portfolio/en/coast.md"), "utf8");
     expect(imported).toContain("/images/portfolio/coast-hero.jpg");
     expect(imported).not.toContain("sourceUrl");
+    expect(imported).not.toMatch(/gallery:[\s\S]*coast-hero\.jpg/);
+  });
+
+  it("fills missing images on existing entries without dropping extra frontmatter", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "site-migrate-import-fill-"));
+    const pack = path.join(root, "pack");
+    const target = path.join(root, "site");
+
+    await write(path.join(target, "src/content/config.ts"), "export const collections = {}");
+    await write(
+      path.join(target, "src/content/portfolio/en/coast.md"),
+      "---\ntitle: Coast\ndescription: Kept\ndate: 2018-04-01\nheroImage: /images/portfolio/coast-hero.jpg\ngallery:\n  - /images/portfolio/coast-1.jpg\ncategories:\n  - Painting\nmedium: Oil\nfeatured: true\n---\n\nClone body.\n",
+    );
+
+    await write(
+      path.join(pack, "portfolio/coast.md"),
+      "---\ntitle: COAST | Studio\ndescription: Chrome\nslug: coast\ndate: 1970-01-01\nheroImage: /images/portfolio/coast-hero.jpg\ngallery:\n  - /images/portfolio/coast-hero.jpg\n  - /images/portfolio/coast-1.jpg\n  - /images/portfolio/coast-2.jpg\n---\n\n![](/images/portfolio/coast-3.jpg)\n",
+    );
+    await mkdir(path.join(pack, "images/portfolio"), { recursive: true });
+    await writeFile(path.join(pack, "images/portfolio/coast-hero.jpg"), PNG);
+    await writeFile(path.join(pack, "images/portfolio/coast-1.jpg"), PNG);
+    await writeFile(path.join(pack, "images/portfolio/coast-2.jpg"), PNG);
+    await writeFile(path.join(pack, "images/portfolio/coast-3.jpg"), PNG);
+
+    const summary = await importPacks({
+      packs: [pack],
+      target,
+      locale: "en",
+      protectedPages: ["home", "about", "contact"],
+      overwritePages: false,
+      overwriteEntries: false,
+      includeFlagged: false,
+      flagInlineBlog: true,
+    });
+
+    expect(summary.filledImages).toContain("portfolio/coast");
+    expect(await exists(path.join(target, "public/images/portfolio/coast-3.jpg"))).toBe(true);
+
+    const filled = await readFile(path.join(target, "src/content/portfolio/en/coast.md"), "utf8");
+    expect(filled).toContain("title: Coast");
+    expect(filled).toContain("Clone body");
+    expect(filled).toContain("medium: Oil");
+    expect(filled).toContain("featured: true");
+    expect(filled).toContain("2018-04-01");
+    expect(filled).toContain("/images/portfolio/coast-2.jpg");
+    expect(filled).toContain("/images/portfolio/coast-3.jpg");
+    expect(filled).not.toMatch(/gallery:[\s\S]*coast-hero\.jpg/);
+  });
+
+  it("strips a site-name suffix from new titles", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "site-migrate-import-title-"));
+    const pack = path.join(root, "pack");
+    const target = path.join(root, "site");
+    await write(path.join(target, "src/content/config.ts"), "export const collections = {}");
+    await write(
+      path.join(pack, "portfolio/cave.md"),
+      "---\ntitle: CAVE | Midghall\ndescription: Drawings\nslug: cave\ndate: 2018-01-01\nheroImage: /images/portfolio/cave-hero.jpg\n---\n\nBody.\n",
+    );
+    await mkdir(path.join(pack, "images/portfolio"), { recursive: true });
+    await writeFile(path.join(pack, "images/portfolio/cave-hero.jpg"), PNG);
+
+    await importPacks({
+      packs: [pack],
+      target,
+      locale: "en",
+      protectedPages: ["about"],
+      overwritePages: false,
+      overwriteEntries: false,
+      includeFlagged: false,
+      flagInlineBlog: true,
+    });
+
+    const imported = await readFile(path.join(target, "src/content/portfolio/en/cave.md"), "utf8");
+    expect(imported).toContain("title: Cave");
+    expect(imported).not.toContain("Midghall");
+  });
+
+  it("does not import a protected slug from portfolio", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "site-migrate-import-home-"));
+    const pack = path.join(root, "pack");
+    const target = path.join(root, "site");
+    await write(path.join(target, "src/content/config.ts"), "export const collections = {}");
+    await write(
+      path.join(pack, "portfolio/home.md"),
+      "---\ntitle: HOME | Studio\ndescription: Hub\nslug: home\ndate: 1970-01-01\nheroImage: /images/portfolio/home-hero.jpg\n---\n\nTiles.\n",
+    );
+    await mkdir(path.join(pack, "images/portfolio"), { recursive: true });
+    await writeFile(path.join(pack, "images/portfolio/home-hero.jpg"), PNG);
+
+    const summary = await importPacks({
+      packs: [pack],
+      target,
+      locale: "en",
+      protectedPages: ["home", "about", "contact"],
+      overwritePages: false,
+      overwriteEntries: false,
+      includeFlagged: false,
+      flagInlineBlog: true,
+    });
+
+    expect(summary.skippedProtected).toContain("portfolio/home");
+    expect(await exists(path.join(target, "src/content/portfolio/en/home.md"))).toBe(false);
   });
 
   it("fails when the target is not an Astro content tree", async () => {

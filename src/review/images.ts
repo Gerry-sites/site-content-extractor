@@ -1,5 +1,5 @@
 import type { ExtractedImage, ExtractedPage } from "../types/schemas.js";
-import { isOtherHost, isSkippableAsset } from "../media/urls.js";
+import { isOtherHost, isSkippableAsset, upgradeMediaUrl } from "../media/urls.js";
 
 export const TITLE_STOPWORDS = new Set(
   [
@@ -82,6 +82,7 @@ export function reviewExtractedPages(
   pages: ExtractedPage[],
   seedUrl: string,
   sitePaths: Map<string, string>,
+  byPageUrl?: Map<string, Map<string, string>>,
 ): ImageReviewEntry[] {
   const entries: ImageReviewEntry[] = [];
   const seen = new Set<string>();
@@ -100,6 +101,7 @@ export function reviewExtractedPages(
       list.unshift({ src: hero, role: "hero" });
     }
 
+    const pageMap = byPageUrl?.get(page.url);
     for (const img of list) {
       const key = `${page.url}|${img.src}`;
       if (seen.has(key)) continue;
@@ -118,7 +120,11 @@ export function reviewExtractedPages(
         remoteUrl: img.src,
         pageUrl: page.url,
         alt: img.alt,
-        sitePath: sitePaths.get(img.src),
+        sitePath:
+          pageMap?.get(img.src) ||
+          pageMap?.get(upgradeMediaUrl(img.src)) ||
+          sitePaths.get(img.src) ||
+          sitePaths.get(upgradeMediaUrl(img.src)),
         flags,
       });
     }

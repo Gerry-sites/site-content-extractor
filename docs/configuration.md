@@ -17,6 +17,7 @@ CLI flags are validated with Zod (`src/types/config.ts`).
 | `overwrite`          | boolean         | `false`              | Wipe output first                            |
 | `skipImages`         | boolean         | `false`              | Alias-style skip                             |
 | `skipBlog`           | boolean         | `false`              | Force pages into `pages/`                    |
+| `skipPrune`          | boolean         | `false`              | Skip writing `<pack>/pruned` (`--skip-prune`) |
 | `platform`           | enum            | `auto`               | Extractor selection                          |
 | `respectRobots`      | boolean         | `true`               | Honor robots.txt                             |
 | `concurrency`        | positive int    | `2`                  | Parallelism                                  |
@@ -46,6 +47,7 @@ const result = await runMigration({
   overwrite: true,
   skipImages: false,
   skipBlog: false,
+  skipPrune: false,
   platform: "auto",
   respectRobots: true,
   concurrency: 2,
@@ -61,7 +63,9 @@ const result = await runMigration({
 ## Astro import
 
 ```bash
-site-migrate import ./output --target /path/to/astro-clone --locale en
+site-migrate import ./output/pruned --target /path/to/astro-clone --locale en
 ```
 
-The importer copies new `portfolio/` and `blog/` slugs into `src/content/{collection}/{locale}/` and unflagged binaries into `public/images/`. Protected pages (`home`, `about`, `contact`) are not overwritten unless `--overwrite-pages`. Review `image-review.json` first.
+The importer copies new `portfolio/` and `blog/` slugs into `src/content/{collection}/{locale}/` and unflagged binaries into `public/images/`. Every `/images/` path in frontmatter and the Markdown body is copied, not only `heroImage` / `gallery`. The hero is omitted from `gallery`. Filling an existing entry keeps extra clone keys (`medium`, `featured`, …) and merges gallery paths.
+
+Protected slugs (`home`, `about`, `contact` by default) are skipped in **every** collection unless `--overwrite-pages` (for `pages/`) or `--overwrite-entries` (for portfolio/blog). Review `image-review.json` first.

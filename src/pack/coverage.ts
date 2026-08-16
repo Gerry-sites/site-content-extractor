@@ -1,6 +1,6 @@
 import type { DiscoveredPage, ExtractedPage } from "../types/schemas.js";
 import { isLowValueCrawlUrl } from "../crawler/seeds.js";
-import { isSkippableAsset, upgradeMediaUrl } from "../media/urls.js";
+import { isSkippableAsset, looksLikeImageUrl, upgradeMediaUrl } from "../media/urls.js";
 
 export type SeedMissing = {
   path: string;
@@ -26,10 +26,7 @@ export function coverageHasHoles(coverage: Coverage): boolean {
   );
 }
 
-export function missingHtmlUrls(
-  pages: DiscoveredPage[],
-  htmlByUrl: Map<string, string>,
-): string[] {
+export function missingHtmlUrls(pages: DiscoveredPage[], htmlByUrl: Map<string, string>): string[] {
   return pages
     .filter((page) => {
       if (htmlByUrl.has(page.normalizedUrl)) return false;
@@ -64,6 +61,7 @@ export function missingImageUrls(
       if (!url || seen.has(url)) continue;
       seen.add(url);
       if (isSkippableAsset(url)) continue;
+      if (/\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(url) || /video\.wixstatic/i.test(url)) continue;
       const upgraded = upgradeMediaUrl(url);
       if (imagePathMap.has(url) || imagePathMap.has(upgraded)) continue;
       if (broken.has(url) || broken.has(upgraded)) {
@@ -84,12 +82,14 @@ export function leftoverRemoteUrls(markdown: string): string[] {
   let match: RegExpExecArray | null;
   while ((match = re.exec(markdown)) !== null) {
     const src = match[1]?.trim().split(/\s+/)[0];
-    if (src && /^https?:\/\//i.test(src) && !isSkippableAsset(src)) {
+    if (src && /^https?:\/\//i.test(src) && !isSkippableAsset(src) && looksLikeImageUrl(src)) {
       found.push(src);
     }
   }
   for (const url of markdown.match(REMOTE_IMG) ?? []) {
     if (isSkippableAsset(url)) continue;
+    if (!looksLikeImageUrl(url) && !/\/v1\/fill\//i.test(url)) continue;
+    if (/\.(mp4|webm|mov|m4v)(?:$|\?)/i.test(url) || /video\.wixstatic/i.test(url)) continue;
     if (/wixstatic|wp\.com|wp-content|wordpress\.com|\/v1\/fill\//i.test(url)) {
       if (!found.includes(url)) found.push(url);
     }
@@ -113,7 +113,7 @@ export function buildCoverage(input: {
   ];
   return {
     discovered: input.pages.length,
-    withHtml: input.htmlByUrl.size,
+    withHtml: input.pages.filter((page) => input.htmlByUrl.has(page.normalizedUrl)).length,
     missingHtml: missingHtmlUrls(input.pages, input.htmlByUrl),
     missingMarkdown: missingMarkdownUrls(input.extracted, input.writtenByUrl),
     missingImages: input.skipImages

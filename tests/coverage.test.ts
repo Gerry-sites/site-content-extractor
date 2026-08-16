@@ -86,6 +86,31 @@ describe("coverage", () => {
     expect(coverage.seedMissing).toEqual([{ path: "/contact", status: 404 }]);
   });
 
+  it("does not count tokenized Wix storefront assets as missing images", () => {
+    const extracted: ExtractedPage[] = [
+      {
+        url: "https://studio.example.com/store",
+        title: "Store",
+        slug: "store",
+        headings: [],
+        htmlContent: "<p>Store</p>",
+        images: [
+          {
+            src: "https://static.wixstatic.com/media/store.webp?token=eyJhbGciOiJIUzI1NiJ9",
+            role: "content",
+          },
+        ],
+        links: [],
+        videos: [],
+        files: [],
+        galleries: [],
+        isBlogPost: false,
+        kind: "page",
+      },
+    ];
+    expect(missingImageUrls(extracted, new Map(), new Set())).toEqual([]);
+  });
+
   it("does not count skippable chrome as missing images", () => {
     const extracted: ExtractedPage[] = [
       {
@@ -109,5 +134,41 @@ describe("coverage", () => {
       },
     ];
     expect(missingImageUrls(extracted, new Map(), new Set())).toEqual([]);
+  });
+
+  it("does not treat videos as leftover remote images", () => {
+    expect(
+      leftoverRemoteUrls(
+        "Watch https://video.wixstatic.com/video/abc123/file.mp4\n![](https://video.wixstatic.com/video/abc123/file.mp4)\n",
+      ),
+    ).toEqual([]);
+    expect(leftoverRemoteUrls("https://static.wixstatic.com/media/clip/file.mp4\n")).toEqual([]);
+  });
+
+  it("does not treat tokenized Wix storefront assets as leftover remotes", () => {
+    expect(
+      leftoverRemoteUrls(
+        "https://static.wixstatic.com/media/store.webp?token=eyJhbGciOiJIUzI1NiJ9\n",
+      ),
+    ).toEqual([]);
+  });
+
+  it("counts withHtml from discovered pages, not extra HTML-cache keys", () => {
+    const coverage = buildCoverage({
+      pages: [page("https://studio.example.com/works")],
+      htmlByUrl: new Map([
+        ["https://studio.example.com/works", "<p>ok</p>"],
+        ["https://studio.example.com/extra", "<p>extra</p>"],
+      ]),
+      extracted: [],
+      writtenByUrl: new Map(),
+      imagePathMap: new Map(),
+      brokenImages: [],
+      markdownContents: ["# Works\n"],
+      seedMissing: [],
+    });
+    expect(coverage.discovered).toBe(1);
+    expect(coverage.withHtml).toBe(1);
+    expect(coverageHasHoles(coverage)).toBe(false);
   });
 });

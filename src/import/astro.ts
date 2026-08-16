@@ -7,6 +7,15 @@ import type { ImageReviewEntry } from "../review/images.js";
 import { isSkippedOnImport } from "../review/images.js";
 import type { ImportOptions } from "../types/config.js";
 import { packFileFromSitePath } from "../pack/paths.js";
+import { extractImageRefs } from "../pack/prune.js";
+import {
+  cleanMarkdownBody,
+  galleryWithoutHero,
+  polishDescription,
+  polishTitle,
+  stripYearHeadings,
+  yearFromHeadings,
+} from "../markdown/cleanup.js";
 
 export type ImportSummary = {
   added: string[];
@@ -23,7 +32,7 @@ function astroKeys(
   frontmatter: Record<string, unknown>,
   collection: string,
 ): Record<string, unknown> {
-  const title = String(frontmatter.title ?? "Untitled");
+  const title = polishTitle(String(frontmatter.title ?? "Untitled"));
   const description = String(frontmatter.description ?? title);
   const next: Record<string, unknown> = {
     title,
@@ -133,13 +142,19 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
         const raw = await readFile(sourceFile, "utf8");
         const parsed = parseFrontmatter(raw);
         const fm = astroKeys(parsed.frontmatter, collection);
+        const packHero = typeof fm.heroImage === "string" ? fm.heroImage : undefined;
+        const packBodyRefs = extractImageRefs(parsed.body, parsed.frontmatter).map((ref) =>
+          ref.startsWith("/") ? ref : `/${ref}`,
+        );
+        fm.gallery = galleryWithoutHero(packHero, [
+          Array.isArray(fm.gallery) ? (fm.gallery as string[]) : undefined,
+          packBodyRefs,
+        ]);
 
-        if (
-          collection === "pages" &&
-          protectedSet.has(slug.toLowerCase()) &&
-          !options.overwritePages
-        ) {
-          if (await exists(destFile)) {
+        if (protectedSet.has(slug.toLowerCase())) {
+          const allow =
+            collection === "pages" ? options.overwritePages : options.overwriteEntries;
+          if (!allow) {
             summary.skippedProtected.push(`${collection}/${slug}`);
             continue;
           }
@@ -156,19 +171,27 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
             packRoot,
             targetRoot,
             parsed.frontmatter,
+            parsed.body,
             skippedSitePaths,
             summary,
           );
           const existingRaw = await readFile(destFile, "utf8");
           const existing = parseFrontmatter(existingRaw);
-          const merged = astroKeys(
-            {
-              ...existing.frontmatter,
-              heroImage: fm.heroImage ?? existing.frontmatter.heroImage,
-              gallery: fm.gallery ?? existing.frontmatter.gallery,
-            },
-            collection,
-          );
+          const existingHero =
+            (typeof existing.frontmatter.heroImage === "string" && existing.frontmatter.heroImage) ||
+            packHero;
+          const merged: Record<string, unknown> = {
+            ...existing.frontmatter,
+            heroImage: packHero ?? existing.frontmatter.heroImage,
+            gallery: galleryWithoutHero(existingHero, [
+              Array.isArray(existing.frontmatter.gallery)
+                ? (existing.frontmatter.gallery as string[])
+                : undefined,
+              Array.isArray(fm.gallery) ? (fm.gallery as string[]) : undefined,
+            ]),
+          };
+          delete merged.slug;
+          delete merged.sourceUrl;
           await mkdir(destDir, { recursive: true });
           await writeFile(destFile, serializeImported(merged, existing.body), "utf8");
           summary.filledImages.push(`${collection}/${slug}`);
@@ -180,7 +203,14 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
           continue;
         }
 
-        await copyEntryImages(packRoot, targetRoot, parsed.frontmatter, skippedSitePaths, summary);
+        await copyEntryImages(
+          packRoot,
+          targetRoot,
+          parsed.frontmatter,
+          parsed.body,
+          skippedSitePaths,
+          summary,
+        );
 
         if (typeof fm.heroImage === "string" && skippedSitePaths.has(fm.heroImage)) {
           delete fm.heroImage;
@@ -191,7 +221,22 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
           );
         }
 
-        const body = stripFlaggedImages(parsed.body, skippedSitePaths);
+        let body = cleanMarkdownBody(
+          stripFlaggedImages(parsed.body, skippedSitePaths),
+          String(fm.title),
+        );
+        fm.description = polishDescription(
+          typeof parsed.frontmatter.description === "string"
+            ? parsed.frontmatter.description
+            : String(fm.description),
+          body,
+          String(fm.title),
+        );
+        if (collection !== "pages" && fm.date === "1970-01-01") {
+          const fromHeading = yearFromHeadings(parsed.body) || yearFromHeadings(body);
+          if (fromHeading) fm.date = fromHeading;
+        }
+        if (collection !== "pages") body = stripYearHeadings(body);
         await mkdir(destDir, { recursive: true });
         await writeFile(destFile, serializeImported(fm, body), "utf8");
         summary.added.push(`${collection}/${slug}`);
@@ -206,13 +251,13 @@ async function copyEntryImages(
   packRoot: string,
   targetRoot: string,
   frontmatter: Record<string, unknown>,
+  body: string,
   skippedSitePaths: Set<string>,
   summary: ImportSummary,
 ): Promise<void> {
-  const refs = [
-    frontmatter.heroImage,
-    ...((frontmatter.gallery as string[] | undefined) ?? []),
-  ].filter((item): item is string => typeof item === "string");
+  const refs = extractImageRefs(body, frontmatter).map((ref) =>
+    ref.startsWith("/") ? ref : `/${ref}`,
+  );
 
   for (const sitePath of refs) {
     if (skippedSitePaths.has(sitePath)) continue;

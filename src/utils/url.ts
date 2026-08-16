@@ -72,7 +72,7 @@ export function pathFromUrl(url: string): string {
 export function isAssetUrl(url: string): boolean {
   try {
     const pathname = new URL(url).pathname.toLowerCase();
-    return /\.(pdf|zip|docx?|xlsx?|pptx?|csv|txt|mp3|mp4|webm|mov|avi|css|js|map|woff2?|ttf|eot)$/i.test(
+    return /\.(pdf|zip|docx?|xlsx?|pptx?|csv|txt|mp3|mp4|webm|mov|avi|css|js|map|woff2?|ttf|eot|xml|xsl|json|ico)$/i.test(
       pathname,
     );
   } catch {

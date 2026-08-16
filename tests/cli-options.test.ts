@@ -17,6 +17,7 @@ describe("CLI options schema", () => {
     expect(parsed.settleMs).toBe(2_500);
     expect(parsed.paths).toEqual(["/about", "/contact"]);
     expect(parsed.skipImages).toBe(false);
+    expect(parsed.skipPrune).toBe(false);
   });
 
   it("rejects invalid URLs", () => {

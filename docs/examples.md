@@ -60,10 +60,10 @@ Produces `content.json` with the full extracted page objects.
 ## Import into an Astro clone
 
 ```bash
-site-migrate import ./migrations/example --target /path/to/astro-clone --locale en
+site-migrate import ./migrations/example/pruned --target /path/to/astro-clone --locale en
 ```
 
-Protected pages (`home`, `about`, `contact`) stay untouched unless `--overwrite-pages`. Flagged images stay out of `public/images/` unless `--include-flagged`.
+Import the pruned folder, not the raw pack. Protected slugs (`home`, `about`, `contact`) are skipped in every collection unless `--overwrite-pages` / `--overwrite-entries`. Flagged images stay out of `public/images/` unless `--include-flagged`. Body `/images/` refs are copied with the hero and gallery.
 
 ## Operator live checks
 

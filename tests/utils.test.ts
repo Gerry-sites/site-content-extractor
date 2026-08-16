@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isInternalLink, normalizeUrl, pathFromUrl, isImageUrl } from "../src/utils/url.js";
+import {
+  isInternalLink,
+  normalizeUrl,
+  pathFromUrl,
+  isImageUrl,
+  isAssetUrl,
+} from "../src/utils/url.js";
 import { sanitizeFilename, toSlug, uniqueSlug } from "../src/utils/slug.js";
 import { sha256, shortHash } from "../src/utils/hash.js";
 
@@ -26,6 +32,13 @@ describe("url utils", () => {
   it("detects image URLs", () => {
     expect(isImageUrl("https://cdn.example.com/a/b.jpg")).toBe(true);
     expect(isImageUrl("https://cdn.example.com/a/b.pdf")).toBe(false);
+  });
+
+  it("treats xml/json/ico as non-HTML assets so they are not crawled", () => {
+    expect(isAssetUrl("https://blog.example.com/osd.xml")).toBe(true);
+    expect(isAssetUrl("https://blog.example.com/feed.json")).toBe(true);
+    expect(isAssetUrl("https://blog.example.com/favicon.ico")).toBe(true);
+    expect(isAssetUrl("https://blog.example.com/about")).toBe(false);
   });
 });
 

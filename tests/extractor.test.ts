@@ -105,6 +105,37 @@ describe("wix extractor", () => {
       packFolder(about.kind, about.isBlogPost),
     );
   });
+
+  it("keeps off-screen Wix Pro Gallery tiles that are aria-hidden", async () => {
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="generator" content="Wix.com Website Builder" />
+    <title>Landscape</title>
+  </head>
+  <body>
+    <div id="SITE_PAGES">
+      <h1>LANDSCAPE</h1>
+      <div class="pro-gallery">
+        <img data-hook="gallery-item-image-img" src="https://static.wixstatic.com/media/bfe860_ba5277b4149749098d8f26734610ca73~mv2.jpg/v1/fill/w_323,h_322,q_90/a.jpg" alt="One" />
+        <div aria-hidden="true">
+          <img data-hook="gallery-item-image-img" src="https://static.wixstatic.com/media/bfe860_4dbc7394010a41ddb17c7281739d14a2~mv2.jpg/v1/fill/w_322,h_322,q_90/b.jpg" alt="Two" />
+          <img data-hook="gallery-item-image-img" src="https://static.wixstatic.com/media/bfe860_c5726b1bf81c40c98b84ccaceef4c6a6~mv2.jpg/v1/fill/w_323,h_322,q_90/c.jpg" alt="Three" />
+          <img data-hook="gallery-item-image-img" src="https://static.wixstatic.com/media/bfe860_1ea6fb161fbd4d4b973d6d43b1568fb8~mv2.jpg/v1/fill/w_322,h_322,q_90/d.jpg" alt="Four" />
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`;
+    const page = await wixExtractor.extractPage({
+      url: "https://studio.example.com/landscape",
+      html,
+      seedUrl: "https://studio.example.com/",
+    });
+    expect(page.images.length).toBeGreaterThanOrEqual(4);
+    expect(page.images.every((img) => img.src.includes("/v1/fit/w_1800"))).toBe(true);
+    expect(page.kind).toBe("gallery");
+  });
 });
 
 describe("wordpress extractor", () => {

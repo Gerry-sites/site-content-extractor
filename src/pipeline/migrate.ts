@@ -20,6 +20,7 @@ import { assignSiteImagePaths } from "../pack/assign.js";
 import { reviewExtractedPages } from "../review/images.js";
 import { buildCoverage, coverageHasHoles } from "../pack/coverage.js";
 import { removeOrphanMarkdown } from "../pack/orphans.js";
+import { prunePack } from "../pack/prune.js";
 import { upgradeMediaUrl } from "../media/urls.js";
 
 export type MigrationResult = {
@@ -159,6 +160,7 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
 
   let brokenImages: string[] = [];
   const imagePathMap = new Map<string, string>();
+  const imagePathsByPage = new Map<string, Map<string, string>>();
 
   if (!options.skipImages && options.images) {
     const downloadResult = await downloadImages(
@@ -198,13 +200,21 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
       outputDir,
       options.skipBlog,
     );
-    for (const [remote, sitePath] of organized) {
+    for (const [remote, sitePath] of organized.byRemoteUrl) {
       imagePathMap.set(remote, sitePath);
       imagePathMap.set(upgradeMediaUrl(remote), sitePath);
     }
+    for (const [pageUrl, pageMap] of organized.byPageUrl) {
+      imagePathsByPage.set(pageUrl, pageMap);
+    }
   }
 
-  const review = reviewExtractedPages(extractedPages, manifest.seedUrl, imagePathMap);
+  const review = reviewExtractedPages(
+    extractedPages,
+    manifest.seedUrl,
+    imagePathMap,
+    imagePathsByPage,
+  );
   await writeJson(path.join(outputDir, "image-review.json"), review);
 
   // 5. Generate markdown
@@ -213,7 +223,7 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
   if (options.markdown) {
     const keep = new Set<string>();
     for (const page of extractedPages) {
-      const md = generateMarkdown(page, imagePathMap, {
+      const md = generateMarkdown(page, imagePathsByPage.get(page.url) ?? imagePathMap, {
         skipBlog: options.skipBlog,
       });
       const outPath = path.join(outputDir, md.relativePath);
@@ -372,6 +382,14 @@ export const collections = { pages, blog };
 
   await writeJson(path.join(outputDir, "report.json"), report);
   await writeReport(outputDir, report);
+
+  if (!options.skipPrune) {
+    const prunedDir = path.join(outputDir, "pruned");
+    const pruned = await prunePack(outputDir, prunedDir);
+    logger.info(
+      `Pruned ${pruned.kept.length} keepers (${pruned.dropped.length} dropped) → ${prunedDir}`,
+    );
+  }
 
   logger.info("");
   logger.info("Migration Summary");

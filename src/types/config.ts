@@ -12,6 +12,7 @@ export const CliOptionsSchema = z.object({
   overwrite: z.boolean().default(false),
   skipImages: z.boolean().default(false),
   skipBlog: z.boolean().default(false),
+  skipPrune: z.boolean().default(false),
   platform: z
     .enum([
       "auto",
@@ -65,3 +66,10 @@ export const ImportOptionsSchema = z.object({
 });
 
 export type ImportOptions = z.infer<typeof ImportOptionsSchema>;
+
+export const PruneOptionsSchema = z.object({
+  packs: z.array(z.string()).min(1),
+  output: z.string().default("pruned-data"),
+});
+
+export type PruneOptions = z.infer<typeof PruneOptionsSchema>;

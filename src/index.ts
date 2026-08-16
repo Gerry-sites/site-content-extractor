@@ -5,6 +5,7 @@ export { listExtractors, getExtractor, registerExtractor } from "./extractors/re
 export type { PlatformExtractor, ExtractionContext } from "./extractors/types.js";
 export { generateMarkdown } from "./markdown/generate.js";
 export { importPacks } from "./import/astro.js";
+export { prunePack } from "./pack/prune.js";
 export { upgradeMediaUrl, isSkippableAsset } from "./media/urls.js";
 export { downloadImages } from "./download/images.js";
 export { validateOutput } from "./validate/markdown.js";

@@ -27,6 +27,16 @@ describe("Wix media URLs", () => {
     expect(wixMediaId(WIX_THUMB)).toBe("bfe860_0d0b5336d5cf49f8930f57ebbcc619af~mv2.jpg");
   });
 
+  it("upgrades Wix ids that include extra _s_N_N dimension suffixes", () => {
+    const url =
+      "https://static.wixstatic.com/media/21b326_ab2a8358d70c4fe4839bf661f8f241cf~mv2_d_8660_5773_s_4_2.jpg/v1/fit/w_650,h_433,q_90,enc_avif,quality_auto/21b326_ab2a8358d70c4fe4839bf661f8f241cf~mv2_d_8660_5773_s_4_2.jpg";
+    expect(wixMediaId(url)).toBe(
+      "21b326_ab2a8358d70c4fe4839bf661f8f241cf~mv2_d_8660_5773_s_4_2.jpg",
+    );
+    expect(upgradeWixUrl(url)).toContain("/v1/fit/w_1800,h_1800");
+    expect(upgradeWixUrl(url)).not.toContain("w_650");
+  });
+
   it("rewrites /v1/fill/ even when the filename is not a Wix media id", () => {
     const cropped =
       "https://static.wixstatic.com/media/photo.jpg/v1/fill/w_290,h_290,al_c,q_80,enc_auto/photo.jpg";
@@ -48,6 +58,14 @@ describe("Wix media URLs", () => {
       isSkippableAsset("https://static.wixstatic.com/media/ce6ec7c11b174c0581e20f42bb865ce3.png"),
     ).toBe(true);
     expect(isSkippableAsset(WIX_THUMB)).toBe(false);
+    expect(
+      isSkippableAsset("https://static.wixstatic.com/media/store.webp?token=eyJhbGciOiJIUzI1NiJ9"),
+    ).toBe(true);
+    expect(
+      isSkippableAsset(
+        "https://static.wixstatic.com/media/bfe860_0d0b5336d5cf49f8930f57ebbcc619af~mv2.jpg",
+      ),
+    ).toBe(false);
   });
 
   it("strips Wix chrome img tags from HTML", () => {

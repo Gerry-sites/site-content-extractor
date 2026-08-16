@@ -58,6 +58,7 @@ export function isLowValueCrawlUrl(url: string): boolean {
     }
     if (parts.includes("attachment") || /\/attachment(\/|$)/.test(path)) return true;
     if (/\/wp-content\/uploads\//i.test(path)) return true;
+    if (/\.(xml|xsl|json|ico)$/i.test(path) || path.endsWith("/osd.xml")) return true;
     if (path === "/" && parsed.search.length > 1 && !parsed.searchParams.has("p")) {
       return true;
     }
