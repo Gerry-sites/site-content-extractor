@@ -5,6 +5,7 @@ import type { Frontmatter } from "../types/schemas.js";
 import { exists, ensureDir, readJson, resetDir, writeJson, writeText } from "../utils/fs.js";
 import type { ImageReviewEntry } from "../review/images.js";
 import { packFileFromSitePath, type PackFolder } from "./paths.js";
+import type { ImageManifestEntry } from "./identity.js";
 import { wordpressOriginalUrl } from "../media/urls.js";
 import { asGalleryEntries, galleryItemSrc } from "./gallery.js";
 import {
@@ -264,6 +265,8 @@ function toFrontmatter(
   };
   if (typeof parsed.heroTitle === "string") fm.heroTitle = parsed.heroTitle;
   if (typeof parsed.heroCaption === "string") fm.heroCaption = parsed.heroCaption;
+  if (typeof parsed.heroMediaId === "string") fm.heroMediaId = parsed.heroMediaId;
+  if (typeof parsed.heroHash === "string") fm.heroHash = parsed.heroHash;
   if (folder !== "pages") {
     let date = typeof parsed.date === "string" ? parsed.date : "1970-01-01";
     if (date === "1970-01-01") {
@@ -407,6 +410,15 @@ export async function prunePack(packDir: string, outputDir: string): Promise<Pru
   }
 
   await writeJson(path.join(output, "image-review.json"), keptReview);
+  const manifestPath = path.join(source, "images-manifest.json");
+  if (await exists(manifestPath)) {
+    const entries = (await readJson<ImageManifestEntry[]>(manifestPath)) ?? [];
+    const hasSitePaths = entries.some((entry) => entry.sitePaths?.length);
+    const keptManifest = hasSitePaths
+      ? entries.filter((entry) => entry.sitePaths?.some((sitePath) => copiedImages.has(sitePath)))
+      : entries;
+    await writeJson(path.join(output, "images-manifest.json"), keptManifest);
+  }
   const summary: PruneSummary = {
     platform: family,
     source,

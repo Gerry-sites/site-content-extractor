@@ -52,6 +52,8 @@ function astroKeys(
   if (typeof frontmatter.heroImage === "string") next.heroImage = frontmatter.heroImage;
   if (typeof frontmatter.heroTitle === "string") next.heroTitle = frontmatter.heroTitle;
   if (typeof frontmatter.heroCaption === "string") next.heroCaption = frontmatter.heroCaption;
+  if (typeof frontmatter.heroMediaId === "string") next.heroMediaId = frontmatter.heroMediaId;
+  if (typeof frontmatter.heroHash === "string") next.heroHash = frontmatter.heroHash;
   if (Array.isArray(frontmatter.gallery)) next.gallery = frontmatter.gallery;
   if (Array.isArray(frontmatter.categories)) next.categories = frontmatter.categories;
   if (Array.isArray(frontmatter.tags)) next.tags = frontmatter.tags;
@@ -201,7 +203,12 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
             (typeof fm.heroCaption === "string" &&
               typeof existing.frontmatter.heroCaption !== "string") ||
             (typeof fm.heroTitle === "string" &&
-              typeof existing.frontmatter.heroTitle !== "string");
+              typeof existing.frontmatter.heroTitle !== "string") ||
+            (typeof fm.heroMediaId === "string" &&
+              typeof existing.frontmatter.heroMediaId !== "string") ||
+            (typeof fm.heroHash === "string" &&
+              (typeof existing.frontmatter.heroHash !== "string" ||
+                existing.frontmatter.heroHash !== fm.heroHash));
           const imageDrift = await destImagesDifferFromPack(
             packRoot,
             targetRoot,
@@ -256,6 +263,16 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
               typeof fm.heroCaption === "string")
           ) {
             if (typeof fm.heroCaption === "string") merged.heroCaption = fm.heroCaption;
+          }
+          if (
+            imageDrift ||
+            (typeof existing.frontmatter.heroMediaId !== "string" &&
+              typeof fm.heroMediaId === "string")
+          ) {
+            if (typeof fm.heroMediaId === "string") merged.heroMediaId = fm.heroMediaId;
+          }
+          if (imageDrift || typeof existing.frontmatter.heroHash !== "string") {
+            if (typeof fm.heroHash === "string") merged.heroHash = fm.heroHash;
           }
           delete merged.slug;
           delete merged.sourceUrl;

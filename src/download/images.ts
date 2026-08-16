@@ -10,6 +10,7 @@ import { sha256, shortHash } from "../utils/hash.js";
 import { processImage } from "../images/process.js";
 import type { Logger } from "../utils/log.js";
 import { isSkippableAsset, upgradeMediaUrl } from "../media/urls.js";
+import { platformMediaId } from "../media/identity.js";
 
 export type DownloadedImage = {
   remoteUrl: string;
@@ -31,6 +32,7 @@ type ManifestEntry = {
   relativePath: string;
   hash: string;
   bytes: number;
+  mediaId?: string;
 };
 
 export async function downloadImages(
@@ -205,12 +207,17 @@ export async function downloadImages(
   );
 
   const images = [...byRemoteUrl.values()];
-  const manifest: ManifestEntry[] = images.map((img) => ({
-    remoteUrl: img.remoteUrl,
-    relativePath: img.relativePath,
-    hash: img.hash,
-    bytes: img.bytes,
-  }));
+  const manifest: ManifestEntry[] = images.map((img) => {
+    const mediaId = platformMediaId(img.remoteUrl);
+    const entry: ManifestEntry = {
+      remoteUrl: img.remoteUrl,
+      relativePath: img.relativePath,
+      hash: img.hash,
+      bytes: img.bytes,
+    };
+    if (mediaId) entry.mediaId = mediaId;
+    return entry;
+  });
   await writeJson(manifestPath, manifest);
 
   return { images, byRemoteUrl, broken };

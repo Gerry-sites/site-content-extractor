@@ -27,7 +27,7 @@ src/
 4. **Download** — Referenced images are fetched, hash-deduplicated, and thumbnailed.
 5. **Markdown** — HTML is converted to human-editable Markdown with YAML frontmatter. Titles drop a ` | Sitename` suffix and ALL CAPS document titles are title-cased, chrome-only or glued descriptions are replaced, year headings fill missing dates, and gallery/portfolio locals are listed in frontmatter (hero omitted from `gallery`) rather than left as body embeds.
 6. **Assets** — `navigation.json`, `metadata.json`, `sitemap.json` are written.
-7. **Report + validate** — `report.md` summarizes the run; validators check titles, slugs, and image refs.
+7. **Report + validate** — `report.md` summarizes the run; validators check titles, slugs, image refs, and that gallery hashes match the files on disk.
 8. **Prune** — unless `--skip-prune`, keepers are copied to `<pack>/pruned` (drafts, hubs, protected slugs, gallery-counter chrome, and hero-only thin pages dropped). Import that folder, not the raw pack.
 
 ## Plugin boundary
@@ -58,6 +58,7 @@ See [Writing platform plugins](plugins.md).
 - URLs are normalized (strip hash/tracking params, sort query keys)
 - Slugs are uniqued deterministically
 - Duplicate images collapse to one file via SHA-256
+- Gallery titles/captions bind to `mediaId` + file hash, not to sequential `slug-2.jpg` slots
 - Manifests are stable JSON with sorted page lists
 
 ## Crawl4AI note

@@ -252,6 +252,53 @@ describe("Astro import", () => {
     expect(filled).toContain("title: My Father");
   });
 
+  it("stamps pack media ids and hashes onto an existing clone gallery", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "site-migrate-import-identity-"));
+    const pack = path.join(root, "pack");
+    const target = path.join(root, "site");
+    const actor = Buffer.from("actor-bytes");
+    const father = Buffer.from("father-bytes");
+
+    await write(path.join(target, "src/content/config.ts"), "export const collections = {}");
+    await write(
+      path.join(target, "src/content/portfolio/en/portraits.md"),
+      "---\ntitle: Portraits\ndescription: Kept\ndate: 2019-01-01\nheroImage: /images/portfolio/portraits-hero.jpg\ngallery:\n  - src: /images/portfolio/portraits-1.jpg\n    title: The Actor\n---\n\nClone body.\n",
+    );
+    await mkdir(path.join(target, "public/images/portfolio"), { recursive: true });
+    await writeFile(path.join(target, "public/images/portfolio/portraits-hero.jpg"), father);
+    await writeFile(path.join(target, "public/images/portfolio/portraits-1.jpg"), actor);
+
+    await write(
+      path.join(pack, "portfolio/portraits.md"),
+      "---\ntitle: Portraits\ndescription: Pack\nslug: portraits\ndate: 1970-01-01\nheroImage: /images/portfolio/portraits-hero.jpg\nheroTitle: My Father\nheroMediaId: bfe860_father~mv2.jpg\nheroHash: fatherhash\ngallery:\n  - src: /images/portfolio/portraits-1.jpg\n    title: The Actor\n    mediaId: bfe860_actor~mv2.jpg\n    hash: actorhash\n---\n\nPack body.\n",
+    );
+    await mkdir(path.join(pack, "images/portfolio"), { recursive: true });
+    await writeFile(path.join(pack, "images/portfolio/portraits-hero.jpg"), father);
+    await writeFile(path.join(pack, "images/portfolio/portraits-1.jpg"), actor);
+
+    const summary = await importPacks({
+      packs: [pack],
+      target,
+      locale: "en",
+      protectedPages: ["home", "about", "contact"],
+      overwritePages: false,
+      overwriteEntries: false,
+      includeFlagged: false,
+      flagInlineBlog: true,
+    });
+
+    expect(summary.filledCaptions).toContain("portfolio/portraits");
+    expect(summary.filledImages).not.toContain("portfolio/portraits");
+    const filled = await readFile(
+      path.join(target, "src/content/portfolio/en/portraits.md"),
+      "utf8",
+    );
+    expect(filled).toContain("Clone body");
+    expect(filled).toContain("mediaId: bfe860_actor~mv2.jpg");
+    expect(filled).toContain("hash: actorhash");
+    expect(filled).toContain("heroMediaId: bfe860_father~mv2.jpg");
+  });
+
   it("does not import a protected slug from portfolio", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "site-migrate-import-home-"));
     const pack = path.join(root, "pack");

@@ -77,6 +77,10 @@ Current import copies every `/images/` path in the Markdown body as well as `her
 
 WordPress inlines are flagged `inline-blog` for review. Default import copies them. If body photos 404, the pack path is missing or you passed `--flag-inline-blog`. Chrome and other-host still skip unless `--include-flagged`.
 
+## Captions do not match the paintings
+
+Titles were bound to sequential filenames (`portraits-2.jpg`). A later extract could write new captions onto those paths without replacing the bytes. Current extract stamps `mediaId` + SHA-256 on each work, import overwrites when the dest file differs, and `site-migrate verify-gallery <pack> --target <clone>` fails if the pairing drifted. Re-extract, verify, then import the pruned pack. Do not treat “skipped existing” as success unless verify is clean.
+
 ## Importing `pruned-data/` looks wrong
 
 Migrate writes keepers to `<pack>/pruned`. `pruned-data/` is only the default parent for a standalone `site-migrate prune` if you do not pass `--output`. Older copies there can still have first-wins `home-N.jpg` paths or hubs. Import `<pack>/pruned`.

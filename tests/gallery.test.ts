@@ -126,49 +126,27 @@ describe("Wix warmup gallery metadata", () => {
       images[0]!.src,
     ]);
   });
-});
 
-describe("gallery captions", () => {
-  it("merges pack titles and captions onto an existing string gallery", () => {
-    expect(
-      mergeGalleryCaptions(
-        ["/images/portfolio/flood-1.jpg", "/images/portfolio/flood-2.jpg"],
-        [
-          {
-            src: "/images/portfolio/flood-1.jpg",
-            title: "After The Flood sketch",
-            caption: "Pencil on paper.",
-          },
-        ],
-      ),
-    ).toEqual([
+  it("does not guess a title from a shared filename when media ids are missing", () => {
+    const items = [
       {
-        src: "/images/portfolio/flood-1.jpg",
-        title: "After The Flood sketch",
-        caption: "Pencil on paper.",
+        mediaUrl: "https://static.wixstatic.com/media/photo.jpg",
+        title: "Guessed from filename",
       },
-      "/images/portfolio/flood-2.jpg",
-    ]);
+    ];
+    const src = "https://cdn.example.com/other/photo.jpg";
+    expect(matchWixGalleryItem(src, items)).toBeUndefined();
   });
 
-  it("reports when existing gallery strings are missing pack captions", () => {
-    expect(
-      captionsNeedMerge(
-        ["/images/portfolio/flood-1.jpg"],
-        [{ src: "/images/portfolio/flood-1.jpg", caption: "Oil on canvas." }],
-      ),
-    ).toBe(true);
-    expect(
-      captionsNeedMerge(
-        [{ src: "/images/portfolio/flood-1.jpg", caption: "Oil on canvas." }],
-        [{ src: "/images/portfolio/flood-1.jpg", caption: "Oil on canvas." }],
-      ),
-    ).toBe(false);
-  });
-
-  it("does not treat an empty pack gallery as a caption update", () => {
-    expect(
-      captionsNeedMerge(["/images/portfolio/flood-1.jpg"], ["/images/portfolio/flood-1.jpg"]),
-    ).toBe(false);
+  it("fails when two warmup items share a media id", () => {
+    const items = [
+      { mediaUrl: "bfe860_aa~mv2.jpg", title: "First" },
+      {
+        mediaUrl: "https://static.wixstatic.com/media/bfe860_aa~mv2.jpg/v1/fit/w_100/x.jpg",
+        title: "Second",
+      },
+    ];
+    const src = "https://static.wixstatic.com/media/bfe860_aa~mv2.jpg/v1/fit/w_1800/a.jpg";
+    expect(() => matchWixGalleryItem(src, items)).toThrow(/Ambiguous Wix gallery match/);
   });
 });

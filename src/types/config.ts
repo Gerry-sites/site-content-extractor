@@ -73,3 +73,11 @@ export const PruneOptionsSchema = z.object({
 });
 
 export type PruneOptions = z.infer<typeof PruneOptionsSchema>;
+
+export const VerifyGalleryOptionsSchema = z.object({
+  pack: z.string().min(1),
+  target: z.string().optional(),
+  locale: z.string().min(1).optional(),
+});
+
+export type VerifyGalleryOptions = z.infer<typeof VerifyGalleryOptionsSchema>;

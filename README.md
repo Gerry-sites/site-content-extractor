@@ -14,6 +14,8 @@ The tool prioritizes **content extraction** over layout reproduction. Plugins co
 - Platform auto-detection (`wix`, `wordpress`, `webflow`, `squarespace`, `generic`)
 - Clean HTML → Markdown with YAML frontmatter (`title`, `description`, `date`, `heroImage`, `gallery`)
 - Image download with Wix/WordPress URL upgrades, hash deduplication, thumbnails
+- Gallery identity (`mediaId` + SHA-256) so captions stay on the matching file across re-extract/import
+- `site-migrate verify-gallery` fails when a title is bound to the wrong bytes
 - `image-review.json` flags chrome / other-host / title-name illustrations
 - `site-migrate import` copies a pack into an Astro starter clone
 - `navigation.json`, `metadata.json`, `sitemap.json`, `report.md`
@@ -81,6 +83,7 @@ output/
 ```bash
 site-migrate <url> [options]
 site-migrate import <pack...> --target <astro-clone>
+site-migrate verify-gallery <pack> [--target <astro-clone>]
 ```
 
 | Option                         | Default           | Description                                                        |
@@ -118,6 +121,14 @@ site-migrate prune ./packs/client --output ./pruned-data
 ```
 
 Import `<pack>/pruned`, not `pruned-data/`.
+
+### Verify gallery pairing
+
+```bash
+site-migrate verify-gallery ./output/pruned --target /path/to/astro-clone
+```
+
+Fails (exit `2`) if a work title/caption is bound to the wrong file: YAML `hash` does not match the bytes on disk, the clone `public/` file differs from the pack, or the same `mediaId` maps to two files. Run this after re-extract or import. Migrate already runs the pack-only check.
 
 ## Documentation
 

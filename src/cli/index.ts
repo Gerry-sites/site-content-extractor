@@ -1,9 +1,15 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { CliOptionsSchema, ImportOptionsSchema, PruneOptionsSchema } from "../types/config.js";
+import {
+  CliOptionsSchema,
+  ImportOptionsSchema,
+  PruneOptionsSchema,
+  VerifyGalleryOptionsSchema,
+} from "../types/config.js";
 import { runMigration } from "../pipeline/migrate.js";
 import { importPacks } from "../import/astro.js";
 import { prunePack } from "../pack/prune.js";
+import { verifyGallery } from "../validate/gallery.js";
 
 const program = new Command();
 
@@ -188,6 +194,44 @@ program
         );
         for (const row of summary.dropped) console.log(`    - ${row.from} (${row.reason})`);
       }
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("verify-gallery")
+  .description("Fail if gallery titles or captions are bound to the wrong image files")
+  .argument("<pack>", "Pack or pruned pack directory")
+  .option("--target <dir>", "Astro site root to compare against the pack")
+  .option("--locale <code>", "Content locale folder when --target is set", "en")
+  .action(async (pack: string, opts: Record<string, unknown>) => {
+    const parsed = VerifyGalleryOptionsSchema.safeParse({
+      pack,
+      target: opts.target,
+      locale: opts.locale,
+    });
+    if (!parsed.success) {
+      console.error("Invalid verify-gallery options:");
+      for (const issue of parsed.error.issues) {
+        console.error(`  - ${issue.path.join(".")}: ${issue.message}`);
+      }
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      const result = await verifyGallery(parsed.data);
+      if (result.ok) {
+        console.log("Gallery pairing is consistent.");
+        return;
+      }
+      console.error("Gallery pairing errors:");
+      for (const item of result.issues) {
+        console.error(`  - ${item.file}: ${item.message}`);
+      }
+      process.exitCode = 2;
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
       process.exitCode = 1;

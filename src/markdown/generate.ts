@@ -13,7 +13,7 @@ import {
   yearFromHeadings,
   localImagePaths,
 } from "./cleanup.js";
-import { galleryItemSrc, type GalleryEntry } from "../pack/gallery.js";
+import { galleryItemSrc, type GalleryEntry, type GalleryItem } from "../pack/gallery.js";
 
 export type MarkdownResult = {
   filename: string;
@@ -66,13 +66,18 @@ function imageMetaForLocal(
   local: string,
   page: ExtractedPage,
   imagePaths: ImagePathMap,
-): { title?: string; caption?: string } | undefined {
+): { title?: string; caption?: string; mediaId?: string; hash?: string } | undefined {
   const img = page.images.find((image) => {
     const mapped = imagePaths.get(image.src) || imagePaths.get(upgradeMediaUrl(image.src));
     return mapped === local;
   });
-  if (!img || (!img.title && !img.caption)) return undefined;
-  return { title: img.title, caption: img.caption };
+  if (!img || (!img.title && !img.caption && !img.mediaId && !img.hash)) return undefined;
+  return {
+    title: img.title,
+    caption: img.caption,
+    mediaId: img.mediaId,
+    hash: img.hash,
+  };
 }
 
 function galleryEntriesForLocals(
@@ -83,11 +88,12 @@ function galleryEntriesForLocals(
   return locals.map((local) => {
     const meta = imageMetaForLocal(local, page, imagePaths);
     if (!meta) return local;
-    return {
-      src: local,
-      ...(meta.title ? { title: meta.title } : {}),
-      ...(meta.caption ? { caption: meta.caption } : {}),
-    };
+    const entry: GalleryItem = { src: local };
+    if (meta.title) entry.title = meta.title;
+    if (meta.caption) entry.caption = meta.caption;
+    if (meta.mediaId) entry.mediaId = meta.mediaId;
+    if (meta.hash) entry.hash = meta.hash;
+    return entry;
   });
 }
 
@@ -158,6 +164,8 @@ export function generateMarkdown(
   };
   if (heroMeta?.title) frontmatter.heroTitle = heroMeta.title;
   if (heroMeta?.caption) frontmatter.heroCaption = heroMeta.caption;
+  if (heroMeta?.mediaId) frontmatter.heroMediaId = heroMeta.mediaId;
+  if (heroMeta?.hash) frontmatter.heroHash = heroMeta.hash;
 
   if (folder !== "pages") {
     frontmatter.date = fallbackDate(page, body);

@@ -1,5 +1,6 @@
 import { access, mkdir, readFile, writeFile, rm, copyFile } from "node:fs/promises";
 import path from "node:path";
+import { sha256 } from "./hash.js";
 
 export async function ensureDir(dir: string): Promise<void> {
   await mkdir(dir, { recursive: true });
@@ -18,6 +19,11 @@ export async function filesEqual(left: string, right: string): Promise<boolean> 
   if (!(await exists(left)) || !(await exists(right))) return false;
   const [a, b] = await Promise.all([readFile(left), readFile(right)]);
   return a.equals(b);
+}
+
+export async function fileSha256(filePath: string): Promise<string | undefined> {
+  if (!(await exists(filePath))) return undefined;
+  return sha256(await readFile(filePath));
 }
 
 export async function writeJson(filePath: string, data: unknown, pretty = true): Promise<void> {

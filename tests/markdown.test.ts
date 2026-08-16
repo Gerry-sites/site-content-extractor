@@ -218,11 +218,15 @@ describe("markdown generation", () => {
           role: "gallery",
           title: "After The Flood",
           caption: "Oil on canvas, 100 cm x 70 cm. A symbolic work.",
+          mediaId: "hero-id",
+          hash: "aaa",
         },
         {
           src: "https://cdn.example.com/sketch.jpg",
           role: "gallery",
           title: "After The Flood sketch",
+          mediaId: "sketch-id",
+          hash: "bbb",
         },
       ],
       links: [],
@@ -248,10 +252,14 @@ describe("markdown generation", () => {
     expect(frontmatter.heroImage).toBe("/images/portfolio/after-the-flood-hero.jpg");
     expect(frontmatter.heroTitle).toBe("After The Flood");
     expect(frontmatter.heroCaption).toContain("Oil on canvas, 100 cm x 70 cm");
+    expect(frontmatter.heroMediaId).toBe("hero-id");
+    expect(frontmatter.heroHash).toBe("aaa");
     expect(frontmatter.gallery).toEqual([
       {
         src: "/images/portfolio/after-the-flood-1.jpg",
         title: "After The Flood sketch",
+        mediaId: "sketch-id",
+        hash: "bbb",
       },
     ]);
     expect(result.content).toContain("Oil on canvas, 100 cm x 70 cm");

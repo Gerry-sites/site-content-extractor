@@ -88,17 +88,37 @@ Import copies every `/images/` path in frontmatter **and** the body, not only `h
 
 New titles drop a ` | Sitename` suffix and title-case ALL CAPS Wix document titles (`CAVE` → `Cave`). Chrome-only or glued Wix descriptions (`DRAWINGCAVE 2018 This project…`) are replaced with the first real paragraph when one exists. New entries still dated `1970-01-01` pick up `## 2018` or `2014 - Ongoing` from the body, extracted headings, or a numeric slug such as `1993`. Standalone year headings are then removed from the body.
 
-| Flag                       | Default              | Description                               |
-| -------------------------- | -------------------- | ----------------------------------------- |
-| `--target <dir>`           | (required)           | Astro site with `src/content/config.ts`   |
-| `--locale <code>`          | `en`                 | Content locale folder                     |
-| `--protected-pages <list>` | `home,about,contact` | Slugs skipped in every collection         |
-| `--overwrite-pages`        | off                  | Allow replacing protected **pages**       |
-| `--overwrite-entries`      | off                  | Replace existing portfolio/blog bodies    |
-| `--include-flagged`        | off                  | Copy chrome / other-host images too       |
-| `--flag-inline-blog`       | off                  | Also skip images flagged `inline-blog`    |
+| Flag                       | Default              | Description                             |
+| -------------------------- | -------------------- | --------------------------------------- |
+| `--target <dir>`           | (required)           | Astro site with `src/content/config.ts` |
+| `--locale <code>`          | `en`                 | Content locale folder                   |
+| `--protected-pages <list>` | `home,about,contact` | Slugs skipped in every collection       |
+| `--overwrite-pages`        | off                  | Allow replacing protected **pages**     |
+| `--overwrite-entries`      | off                  | Replace existing portfolio/blog bodies  |
+| `--include-flagged`        | off                  | Copy chrome / other-host images too     |
+| `--flag-inline-blog`       | off                  | Also skip images flagged `inline-blog`  |
 
 `inline-blog` and `title-name-in-media` are review labels. Default import copies those files. Chrome and other-host stay out unless `--include-flagged`.
+
+### Verify gallery titles still match the files
+
+```bash
+site-migrate verify-gallery ./migrated/pruned --target /path/to/astro-clone --locale en
+```
+
+Captions are bound to `mediaId` (when the CMS has one) and the SHA-256 of the file, not to `slug-2.jpg`. This command **exits 2** when:
+
+- YAML `hash` does not match the bytes on disk
+- the clone `public/` file at that path is a different work than the pack
+- the same `mediaId` maps to two different files or two captions
+- a pack gallery file is missing from the clone
+
+Migrate already runs the pack-only check. Run this with `--target` after import, or after a re-extract onto an existing clone.
+
+| Flag              | Default    | Description                                  |
+| ----------------- | ---------- | -------------------------------------------- |
+| `--target <dir>`  | (optional) | Astro site with `src/content/`               |
+| `--locale <code>` | `en`       | Content locale folder when `--target` is set |
 
 ### Prune drafts and hub pages before import
 
@@ -134,30 +154,30 @@ Other enum values (`ghost`, `framer`, …) are reserved for future plugins — s
 
 ## Exit codes
 
-| Code | Meaning                                         |
-| ---- | ----------------------------------------------- |
-| `0`  | Success                                         |
-| `1`  | Fatal error (invalid args, crawl failure, etc.) |
-| `2`  | Completed with validation or coverage holes     |
+| Code | Meaning                                                       |
+| ---- | ------------------------------------------------------------- |
+| `0`  | Success                                                       |
+| `1`  | Fatal error (invalid args, crawl failure, etc.)               |
+| `2`  | Completed with validation, coverage, or gallery pairing holes |
 
 ## Output files
 
-| File                              | Purpose                                                       |
-| --------------------------------- | ------------------------------------------------------------- |
-| `pages/*.md`                      | Regular pages                                                 |
-| `blog/*.md`                       | Detected blog posts                                           |
-| `portfolio/*.md`                  | Gallery / portfolio pages                                     |
-| `images/`                         | Downloaded originals                                          |
-| `images/thumbs/`                  | WebP thumbnails                                               |
-| `navigation.json`                 | Site nav                                                      |
-| `metadata.json`                   | Site-wide metadata                                            |
-| `sitemap.json`                    | Discovered URL list                                           |
-| `pages.json`                      | Crawl manifest (resume support)                               |
-| `images-manifest.json`            | Image download resume support                                 |
-| `report.md`                       | Human-readable summary (Coverage + Review)                    |
-| `html/` / `html-index.json`       | Cached hydrated HTML for `--resume`                           |
-| `pruned/`                         | Import-ready keepers (unless `--skip-prune`)                  |
-| `image-review.json`               | Flagged chrome / other-host / title-name / inline-blog images |
-| `astro-content.config.example.ts` | Astro collections starter                                     |
+| File                              | Purpose                                                           |
+| --------------------------------- | ----------------------------------------------------------------- |
+| `pages/*.md`                      | Regular pages                                                     |
+| `blog/*.md`                       | Detected blog posts                                               |
+| `portfolio/*.md`                  | Gallery / portfolio pages                                         |
+| `images/`                         | Downloaded originals                                              |
+| `images/thumbs/`                  | WebP thumbnails                                                   |
+| `navigation.json`                 | Site nav                                                          |
+| `metadata.json`                   | Site-wide metadata                                                |
+| `sitemap.json`                    | Discovered URL list                                               |
+| `pages.json`                      | Crawl manifest (resume support)                                   |
+| `images-manifest.json`            | Image download resume + `mediaId` / `hash` / assigned `sitePaths` |
+| `report.md`                       | Human-readable summary (Coverage + Review)                        |
+| `html/` / `html-index.json`       | Cached hydrated HTML for `--resume`                               |
+| `pruned/`                         | Import-ready keepers (unless `--skip-prune`)                      |
+| `image-review.json`               | Flagged chrome / other-host / title-name / inline-blog images     |
+| `astro-content.config.example.ts` | Astro collections starter                                         |
 
 `report.md` includes a **Coverage** table: expected HTML (excluding 404s and `osd.xml`), missing HTML, missing Markdown, missing image downloads, leftover remote thumbs, and extra seeds that returned 404 (warnings only). Any coverage hole besides extra-seed 404s makes the CLI exit `2`. When prune runs, exit `2` is based on the **pruned** pack, not raw hubs.

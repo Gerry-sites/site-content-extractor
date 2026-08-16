@@ -1,7 +1,11 @@
+import { galleryIdentityKey } from "../media/identity.js";
+
 export type GalleryItem = {
   src: string;
   title?: string;
   caption?: string;
+  mediaId?: string;
+  hash?: string;
 };
 
 export type GalleryEntry = string | GalleryItem;
@@ -16,20 +20,70 @@ export function gallerySrcs(items: unknown): string[] {
   return asGalleryEntries(items).map(galleryItemSrc).filter(Boolean);
 }
 
+export function galleryItemIdentity(item: GalleryEntry): string | undefined {
+  if (typeof item === "string") return undefined;
+  return galleryIdentityKey(item);
+}
+
+export function galleryItemsMatch(left: GalleryEntry, right: GalleryEntry): boolean {
+  const leftKey = galleryItemIdentity(left);
+  const rightKey = galleryItemIdentity(right);
+  if (leftKey && rightKey) return leftKey === rightKey;
+  return galleryItemSrc(left) === galleryItemSrc(right);
+}
+
+export function findMatchingGalleryItem(
+  haystack: GalleryEntry[] | undefined,
+  needle: GalleryEntry,
+): GalleryEntry | undefined {
+  const items = asGalleryEntries(haystack);
+  const needleKey = galleryItemIdentity(needle);
+  if (needleKey) {
+    const byId = items.find((item) => galleryItemIdentity(item) === needleKey);
+    if (byId) return byId;
+  }
+  const src = galleryItemSrc(needle);
+  return items.find((item) => galleryItemSrc(item) === src);
+}
+
+function asGalleryItem(item: GalleryEntry): GalleryItem {
+  return typeof item === "string" ? { src: item } : item;
+}
+
+function mergeGalleryItem(current: GalleryEntry, incoming: GalleryEntry): GalleryItem {
+  const have = asGalleryItem(current);
+  const meta = asGalleryItem(incoming);
+  const next: GalleryItem = { src: galleryItemSrc(current) };
+  const title = meta.title || have.title;
+  const caption = meta.caption || have.caption;
+  const mediaId = meta.mediaId || have.mediaId;
+  const hash = meta.hash || have.hash;
+  if (title) next.title = title;
+  if (caption) next.caption = caption;
+  if (mediaId) next.mediaId = mediaId;
+  if (hash) next.hash = hash;
+  return next;
+}
+
 export function captionsNeedMerge(
   existing: GalleryEntry[] | undefined,
   pack: GalleryEntry[] | undefined,
 ): boolean {
   const current = asGalleryEntries(existing);
   const incoming = asGalleryEntries(pack);
-  const bySrc = new Map(current.map((item) => [galleryItemSrc(item), item]));
   for (const item of incoming) {
     if (typeof item === "string") continue;
-    if (!item.title && !item.caption) continue;
-    const have = bySrc.get(galleryItemSrc(item));
-    if (!have || typeof have === "string") return true;
-    if (item.title && item.title !== have.title) return true;
-    if (item.caption && item.caption !== have.caption) return true;
+    const have = findMatchingGalleryItem(current, item);
+    if (item.title || item.caption) {
+      if (!have || typeof have === "string") return true;
+      if (item.title && item.title !== have.title) return true;
+      if (item.caption && item.caption !== have.caption) return true;
+    }
+    if (item.mediaId || item.hash) {
+      if (!have || typeof have === "string") return true;
+      if (item.mediaId && item.mediaId !== have.mediaId) return true;
+      if (item.hash && item.hash !== have.hash) return true;
+    }
   }
   return false;
 }
@@ -50,11 +104,12 @@ export function asGalleryEntries(items: unknown): GalleryEntry[] {
     }
     if (item && typeof item === "object" && typeof (item as GalleryItem).src === "string") {
       const row = item as GalleryItem;
-      out.push({
-        src: row.src,
-        title: row.title,
-        caption: row.caption,
-      });
+      const next: GalleryItem = { src: row.src };
+      if (row.title) next.title = row.title;
+      if (row.caption) next.caption = row.caption;
+      if (row.mediaId) next.mediaId = row.mediaId;
+      if (row.hash) next.hash = row.hash;
+      out.push(next);
     }
   }
   return out;
@@ -88,12 +143,14 @@ export function mergeGalleryCaptions(
   const current = asGalleryEntries(existing);
   const incoming = asGalleryEntries(pack);
   if (!incoming.length) return current;
-  const bySrc = new Map<string, GalleryItem>();
-  for (const item of incoming) {
-    if (typeof item === "string") continue;
-    bySrc.set(galleryItemSrc(item), item);
+
+  const unused = [...incoming];
+  function takeMatch(item: GalleryEntry): GalleryEntry | undefined {
+    const idx = unused.findIndex((candidate) => galleryItemsMatch(item, candidate));
+    if (idx === -1) return undefined;
+    const [meta] = unused.splice(idx, 1);
+    return meta;
   }
-  if (!bySrc.size && current.length) return current;
 
   const seen = new Set<string>();
   const out: GalleryEntry[] = [];
@@ -102,18 +159,14 @@ export function mergeGalleryCaptions(
     const src = galleryItemSrc(item);
     if (seen.has(src)) continue;
     seen.add(src);
-    const meta = bySrc.get(src);
+    const meta = takeMatch(item);
     if (!meta) {
       out.push(typeof item === "string" ? src : item);
       continue;
     }
-    out.push({
-      src,
-      title: meta.title || (typeof item === "string" ? undefined : item.title),
-      caption: meta.caption || (typeof item === "string" ? undefined : item.caption),
-    });
+    out.push(mergeGalleryItem(item, meta));
   }
-  for (const item of incoming) {
+  for (const item of unused) {
     const src = galleryItemSrc(item);
     if (seen.has(src)) continue;
     seen.add(src);

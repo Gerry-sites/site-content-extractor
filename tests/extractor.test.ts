@@ -189,6 +189,7 @@ describe("wix extractor", () => {
     const sketch = page.images.find((img) => img.src.includes("bfe860_sketch~mv2.jpg"));
     expect(painting?.title).toBe("After The Flood");
     expect(painting?.caption).toContain("Oil on canvas, 100 cm x 70 cm");
+    expect(painting?.mediaId).toBe("bfe860_cc280acbdadf439b85e9d4d898cf244e~mv2.jpg");
     expect(sketch?.title).toBe("After The Flood sketch");
     expect(sketch?.caption).toBeUndefined();
   });
@@ -241,6 +242,96 @@ describe("wix extractor", () => {
     expect(page.galleries[0]?.images[1]).toContain("bfe860_father~mv2.jpg");
     expect(page.images.find((img) => img.src.includes("father"))?.title).toBe("My Father");
   });
+
+  it("does not attach a warmup title when only the filename matches", async () => {
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="generator" content="Wix.com Website Builder" />
+    <title>Works</title>
+    <script type="application/json" id="wix-warmup-data">${JSON.stringify({
+      pages: {
+        appsWarmupData: {
+          tpa: {
+            "comp-gallery_galleryData": {
+              items: [
+                {
+                  mediaUrl: "https://static.wixstatic.com/media/photo.jpg",
+                  metaData: { title: "Guessed from filename" },
+                },
+              ],
+            },
+          },
+        },
+      },
+    })}</script>
+  </head>
+  <body>
+    <div id="SITE_PAGES">
+      <div data-testid="pro-gallery">
+        <img src="https://static.wixstatic.com/media/photo.jpg/v1/fill/w_323,h_322,q_90/photo.jpg" alt="" />
+        <img src="https://static.wixstatic.com/media/other.jpg/v1/fill/w_322,h_322,q_90/other.jpg" alt="" />
+        <img src="https://static.wixstatic.com/media/third.jpg/v1/fill/w_322,h_322,q_90/third.jpg" alt="" />
+        <img src="https://static.wixstatic.com/media/fourth.jpg/v1/fill/w_322,h_322,q_90/fourth.jpg" alt="" />
+      </div>
+    </div>
+  </body>
+</html>`;
+    const page = await wixExtractor.extractPage({
+      url: "https://studio.example.com/works",
+      html,
+      seedUrl: "https://studio.example.com/",
+    });
+    expect(page.images.some((img) => img.title === "Guessed from filename")).toBe(false);
+  });
+
+  it("fails extraction when two warmup items share a media id", async () => {
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="generator" content="Wix.com Website Builder" />
+    <title>Portraits</title>
+    <script type="application/json" id="wix-warmup-data">${JSON.stringify({
+      pages: {
+        appsWarmupData: {
+          tpa: {
+            "comp-gallery_galleryData": {
+              items: [
+                {
+                  mediaUrl: "bfe860_aa~mv2.jpg",
+                  metaData: { title: "First" },
+                },
+                {
+                  mediaUrl:
+                    "https://static.wixstatic.com/media/bfe860_aa~mv2.jpg/v1/fit/w_100/x.jpg",
+                  metaData: { title: "Second" },
+                },
+              ],
+            },
+          },
+        },
+      },
+    })}</script>
+  </head>
+  <body>
+    <div id="SITE_PAGES">
+      <div data-testid="pro-gallery">
+        <img src="https://static.wixstatic.com/media/bfe860_aa~mv2.jpg/v1/fill/w_323,h_322,q_90/a.jpg" alt="" />
+        <img src="https://static.wixstatic.com/media/bfe860_bb~mv2.jpg/v1/fill/w_322,h_322,q_90/b.jpg" alt="" />
+        <img src="https://static.wixstatic.com/media/bfe860_cc~mv2.jpg/v1/fill/w_322,h_322,q_90/c.jpg" alt="" />
+        <img src="https://static.wixstatic.com/media/bfe860_dd~mv2.jpg/v1/fill/w_322,h_322,q_90/d.jpg" alt="" />
+      </div>
+    </div>
+  </body>
+</html>`;
+    await expect(
+      wixExtractor.extractPage({
+        url: "https://studio.example.com/portraits",
+        html,
+        seedUrl: "https://studio.example.com/",
+      }),
+    ).rejects.toThrow(/Ambiguous Wix gallery match/);
+  });
 });
 
 describe("wordpress extractor", () => {
@@ -289,5 +380,6 @@ describe("wordpress extractor", () => {
       seedUrl: "https://blog.example.com/",
     });
     expect(page.images[0]?.caption).toBe("Olive oil on toast, 2016");
+    expect(page.images[0]?.mediaId).toBe("toast.jpg");
   });
 });

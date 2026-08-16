@@ -17,11 +17,13 @@ import { ensureDir, exists, resetDir, writeJson, writeText } from "../utils/fs.j
 import { createLogger } from "../utils/log.js";
 import { uniqueSlug } from "../utils/slug.js";
 import { assignSiteImagePaths } from "../pack/assign.js";
+import { imageManifestEntries, stampPageImageIdentity } from "../pack/identity.js";
 import { reviewExtractedPages } from "../review/images.js";
 import { buildCoverage, coverageHasHoles } from "../pack/coverage.js";
 import { removeOrphanMarkdown } from "../pack/orphans.js";
 import { prunePack } from "../pack/prune.js";
 import { upgradeMediaUrl } from "../media/urls.js";
+import { verifyGallery } from "../validate/gallery.js";
 
 export type MigrationResult = {
   report: MigrationReport;
@@ -200,6 +202,11 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
       outputDir,
       options.skipBlog,
     );
+    stampPageImageIdentity(extractedPages, downloadResult.byRemoteUrl);
+    await writeJson(
+      path.join(outputDir, "images-manifest.json"),
+      imageManifestEntries(downloadResult.images, organized),
+    );
     for (const [remote, sitePath] of organized.byRemoteUrl) {
       imagePathMap.set(remote, sitePath);
       imagePathMap.set(upgradeMediaUrl(remote), sitePath);
@@ -285,10 +292,12 @@ const pages = defineCollection({
       .array(
         z.union([
           z.string(),
-          z.object({
+            z.object({
             src: z.string(),
             title: z.string().optional(),
             caption: z.string().optional(),
+            mediaId: z.string().optional(),
+            hash: z.string().optional(),
           }),
         ]),
       )
@@ -331,8 +340,12 @@ export const collections = { pages, blog };
   for (const issue of rawValidation.issues) {
     warnings.push(`[${issue.level}] ${issue.file}: ${issue.message}`);
   }
+  const rawGallery = await verifyGallery({ pack: outputDir });
+  for (const item of rawGallery.issues) {
+    warnings.push(`[${item.level}] ${item.file}: ${item.message}`);
+  }
 
-  let prunedValidationOk = rawValidation.ok;
+  let prunedValidationOk = rawValidation.ok && rawGallery.ok;
   if (!options.skipPrune) {
     const prunedDir = path.join(outputDir, "pruned");
     const pruned = await prunePack(outputDir, prunedDir);
@@ -343,7 +356,11 @@ export const collections = { pages, blog };
     for (const issue of prunedValidation.issues) {
       warnings.push(`[pruned ${issue.level}] ${issue.file}: ${issue.message}`);
     }
-    prunedValidationOk = prunedValidation.ok;
+    const prunedGallery = await verifyGallery({ pack: prunedDir });
+    for (const item of prunedGallery.issues) {
+      warnings.push(`[pruned ${item.level}] ${item.file}: ${item.message}`);
+    }
+    prunedValidationOk = prunedValidation.ok && prunedGallery.ok;
   }
 
   if (coverage.missingHtml.length) {

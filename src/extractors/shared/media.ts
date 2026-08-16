@@ -8,6 +8,7 @@ import type {
 } from "../../types/schemas.js";
 import { isInternalLink, toAbsoluteUrl, isImageUrl } from "../../utils/url.js";
 import { isSkippableAsset, upgradeMediaUrl } from "../../media/urls.js";
+import { platformMediaId } from "../../media/identity.js";
 
 function resolveImageSrc(src: string, pageUrl: string): string | undefined {
   const absolute = toAbsoluteUrl(src, pageUrl);
@@ -51,6 +52,7 @@ export function extractImages($: CheerioAPI, pageUrl: string): ExtractedImage[] 
       src: absolute,
       alt: $(el).attr("alt")?.trim() || undefined,
       caption: caption || undefined,
+      mediaId: platformMediaId(absolute),
       width: Number.isFinite(width) ? width : undefined,
       height: Number.isFinite(height) ? height : undefined,
       role: "content",
@@ -65,7 +67,7 @@ export function extractImages($: CheerioAPI, pageUrl: string): ExtractedImage[] 
     const absolute = resolveImageSrc(match[1], pageUrl);
     if (!absolute || seen.has(absolute) || !isImageUrl(absolute)) return;
     seen.add(absolute);
-    images.push({ src: absolute, role: "content" });
+    images.push({ src: absolute, mediaId: platformMediaId(absolute), role: "content" });
   });
 
   return images;

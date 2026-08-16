@@ -11,21 +11,6 @@ type Warmup = {
   appsWarmupData?: Record<string, Record<string, unknown>>;
 };
 
-function decodePath(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
-export function mediaFileName(src: string): string {
-  const trimmed = src.split("?")[0] ?? src;
-  const slash = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
-  const name = slash === -1 ? trimmed : trimmed.slice(slash + 1);
-  return decodePath(name).toLowerCase();
-}
-
 function isGalleryItem(raw: unknown): raw is {
   mediaUrl?: string;
   metaData?: { title?: string; description?: string; name?: string };
@@ -77,15 +62,12 @@ export function matchWixGalleryItem(
   items: WixGalleryItemMeta[],
 ): WixGalleryItemMeta | undefined {
   const srcId = wixMediaId(src);
-  if (srcId) {
-    const exact = items.find((item) => wixMediaId(item.mediaUrl) === srcId);
-    if (exact) return exact;
+  if (!srcId) return undefined;
+  const matches = items.filter((item) => wixMediaId(item.mediaUrl) === srcId);
+  if (matches.length > 1) {
+    throw new Error(`Ambiguous Wix gallery match for ${srcId}`);
   }
-  const srcFile = mediaFileName(src);
-  return items.find((item) => {
-    const itemFile = mediaFileName(item.mediaUrl);
-    return Boolean(itemFile) && srcFile === itemFile;
-  });
+  return matches[0];
 }
 
 /** Keep Wix Pro Gallery order so titles stay on the same works as on the source site. */
@@ -115,17 +97,19 @@ export function orderImagesByWixGallery<T extends { src: string }>(
   return ordered;
 }
 
-export function applyWixGalleryMetadata<T extends { src: string; alt?: string }>(
+export function applyWixGalleryMetadata<T extends { src: string; alt?: string; mediaId?: string }>(
   images: T[],
   html: string,
-): Array<T & { title?: string; caption?: string }> {
+): Array<T & { title?: string; caption?: string; mediaId?: string }> {
   const items = extractWixGalleryItems(html);
   if (!items.length) return images;
   return images.map((img) => {
+    const mediaId = wixMediaId(img.src) || img.mediaId;
     const meta = matchWixGalleryItem(img.src, items);
-    if (!meta) return img;
+    if (!meta) return mediaId ? { ...img, mediaId } : img;
     return {
       ...img,
+      mediaId,
       alt: img.alt || meta.title,
       title: meta.title,
       caption: meta.description,
