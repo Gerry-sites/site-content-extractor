@@ -53,6 +53,9 @@ export async function validateOutput(outputDir: string): Promise<ValidationResul
     if (!fm.title?.trim()) {
       issues.push({ file: rel, level: "error", message: "Missing title" });
     }
+    if (!fm.description?.trim()) {
+      issues.push({ file: rel, level: "error", message: "Missing description" });
+    }
     if (!fm.slug?.trim()) {
       issues.push({ file: rel, level: "error", message: "Missing slug" });
     } else if (slugs.has(fm.slug)) {
@@ -63,6 +66,15 @@ export async function validateOutput(outputDir: string): Promise<ValidationResul
       });
     } else {
       slugs.set(fm.slug, rel);
+    }
+
+    const isDatedCollection = rel.startsWith("blog/") || rel.startsWith("portfolio/");
+    if (isDatedCollection && (!fm.date || fm.date === "1970-01-01")) {
+      issues.push({
+        file: rel,
+        level: "error",
+        message: "Missing real date (1970-01-01 means article date was not found)",
+      });
     }
 
     // Validate image references exist on disk
@@ -81,7 +93,9 @@ export async function validateOutput(outputDir: string): Promise<ValidationResul
         });
         continue;
       }
+      const relative = ref.replace(/^\//, "");
       const candidates = [
+        path.join(outputDir, relative),
         path.join(outputDir, ref),
         path.join(path.dirname(file), ref),
         path.join(outputDir, "images", path.basename(ref)),

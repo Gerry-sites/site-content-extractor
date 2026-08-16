@@ -74,7 +74,7 @@ it("detects MyPlatform", async () => {
 
 `generic`, `wix`, `webflow`, `squarespace`, `cargo`, `wordpress`, `ghost`, `framer`, `adobe-portfolio`
 
-Implemented today: `generic`, `wix`, `webflow` (detect + generic extract), `squarespace` (detect + generic extract).
+Implemented today: `generic`, `wix`, `wordpress`, `webflow` (detect + generic extract), `squarespace` (detect + generic extract).
 
 ## Testing a plugin
 

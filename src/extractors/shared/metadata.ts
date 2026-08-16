@@ -17,10 +17,7 @@ const SOCIAL_HOSTS: Record<string, string> = {
   "vimeo.com": "vimeo",
 };
 
-export function extractSiteMetadata(
-  $: CheerioAPI,
-  pageUrl: string,
-): SiteMetadata {
+export function extractSiteMetadata($: CheerioAPI, pageUrl: string): SiteMetadata {
   const siteTitle =
     $('meta[property="og:site_name"]').attr("content")?.trim() ||
     $("title").first().text().trim() ||
@@ -67,21 +64,15 @@ export function extractSiteMetadata(
     siteTitle,
     description,
     canonicalUrl: toAbsoluteUrl(canonical, pageUrl) ?? pageUrl,
-    favicon: faviconHref
-      ? (toAbsoluteUrl(faviconHref, pageUrl) ?? undefined)
-      : undefined,
+    favicon: faviconHref ? (toAbsoluteUrl(faviconHref, pageUrl) ?? undefined) : undefined,
     logo: logo ? (toAbsoluteUrl(logo, pageUrl) ?? undefined) : undefined,
     language: $("html").attr("lang") || undefined,
     socialLinks,
     openGraph: {
       title: $('meta[property="og:title"]').attr("content") || undefined,
-      description:
-        $('meta[property="og:description"]').attr("content") || undefined,
+      description: $('meta[property="og:description"]').attr("content") || undefined,
       image: $('meta[property="og:image"]').attr("content")
-        ? (toAbsoluteUrl(
-            $('meta[property="og:image"]').attr("content")!,
-            pageUrl,
-          ) ?? undefined)
+        ? (toAbsoluteUrl($('meta[property="og:image"]').attr("content")!, pageUrl) ?? undefined)
         : undefined,
       type: $('meta[property="og:type"]').attr("content") || undefined,
       url: $('meta[property="og:url"]').attr("content") || undefined,
@@ -89,8 +80,7 @@ export function extractSiteMetadata(
     twitter: {
       card: $('meta[name="twitter:card"]').attr("content") || undefined,
       title: $('meta[name="twitter:title"]').attr("content") || undefined,
-      description:
-        $('meta[name="twitter:description"]').attr("content") || undefined,
+      description: $('meta[name="twitter:description"]').attr("content") || undefined,
       image: $('meta[name="twitter:image"]').attr("content") || undefined,
       site: $('meta[name="twitter:site"]').attr("content") || undefined,
     },

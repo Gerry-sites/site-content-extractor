@@ -1,0 +1,93 @@
+import { describe, expect, it } from "vitest";
+import { applyCurrentSrc, injectResourceImages, isLoadMoreLabel } from "../src/crawler/hydrate.js";
+import { extraSeedUrls, discoveryFeedUrls, isLowValueCrawlUrl } from "../src/crawler/seeds.js";
+import { extractUrlsFromFeedXml } from "../src/crawler/feeds.js";
+import { discoverWordpressPostUrls } from "../src/crawler/wordpress-rest.js";
+
+describe("hydrate HTML", () => {
+  it("rewrites img src to currentSrc", () => {
+    const html = `<img src="/thumb.jpg" alt="Work"></body>`;
+    const next = applyCurrentSrc(html, [
+      { src: "/thumb.jpg", currentSrc: "https://static.wixstatic.com/media/full.jpg" },
+    ]);
+    expect(next).toContain("https://static.wixstatic.com/media/full.jpg");
+    expect(next).not.toContain('src="/thumb.jpg"');
+  });
+
+  it("injects resource URLs that are not already in HTML", () => {
+    const html = `<html><body><p>Hi</p></body></html>`;
+    const next = injectResourceImages(html, ["https://static.wixstatic.com/media/extra.jpg"]);
+    expect(next).toContain("https://static.wixstatic.com/media/extra.jpg");
+  });
+
+  it("recognizes load-more labels", () => {
+    expect(isLoadMoreLabel("Load more")).toBe(true);
+    expect(isLoadMoreLabel("Show More")).toBe(true);
+    expect(isLoadMoreLabel("Subscribe")).toBe(false);
+  });
+});
+
+describe("seed URLs", () => {
+  it("builds extra seeds from the origin, not a hardcoded host", () => {
+    const urls = extraSeedUrls("https://studio.example.com/", ["/about", "/contact", "cv"]);
+    expect(urls).toContain("https://studio.example.com/about");
+    expect(urls).toContain("https://studio.example.com/contact");
+    expect(urls.some((url) => url.endsWith("/cv"))).toBe(true);
+  });
+
+  it("skips WordPress tag/category/author archives", () => {
+    expect(isLowValueCrawlUrl("https://blog.example.com/tag/dinner")).toBe(true);
+    expect(isLowValueCrawlUrl("https://blog.example.com/category/recipes")).toBe(true);
+    expect(isLowValueCrawlUrl("https://blog.example.com/author/editor")).toBe(true);
+    expect(isLowValueCrawlUrl("https://blog.example.com/2020/01/hello-post")).toBe(false);
+    expect(isLowValueCrawlUrl("https://blog.example.com/about")).toBe(false);
+    expect(isLowValueCrawlUrl("https://blog.example.com/2014/11")).toBe(true);
+    expect(
+      isLowValueCrawlUrl("https://blog.example.com/2015/12/30/about-albi-museum/www-albi-03"),
+    ).toBe(true);
+    expect(isLowValueCrawlUrl("https://blog.example.com/2015/12/30/about-albi-museum")).toBe(false);
+  });
+
+  it("lists feed discovery URLs on the seed origin", () => {
+    const feeds = discoveryFeedUrls("https://blog.example.com/posts");
+    expect(feeds.every((url) => url.startsWith("https://blog.example.com"))).toBe(true);
+    expect(feeds.some((url) => url.endsWith("/feed"))).toBe(true);
+  });
+});
+
+describe("feeds", () => {
+  it("extracts internal item links from RSS XML", () => {
+    const xml = `
+      <rss><channel>
+        <item><link>https://blog.example.com/2020/01/hello/</link></item>
+        <item><link>https://other.example/nope</link></item>
+      </channel></rss>
+    `;
+    const urls = extractUrlsFromFeedXml(xml, "https://blog.example.com/");
+    expect(urls).toContain("https://blog.example.com/2020/01/hello");
+    expect(urls.some((url) => url.includes("other.example"))).toBe(false);
+  });
+});
+
+describe("WordPress REST discovery", () => {
+  it("paginates wp/v2 using the seed origin", async () => {
+    const calls: string[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      calls.push(url);
+      expect(url.startsWith("https://blog.example.com/")).toBe(true);
+      return new Response(JSON.stringify([{ link: "https://blog.example.com/hello-post/" }]), {
+        status: 200,
+        headers: { "content-type": "application/json", "X-WP-TotalPages": "1" },
+      });
+    }) as typeof fetch;
+
+    const urls = await discoverWordpressPostUrls(
+      "https://blog.example.com/",
+      "test-agent",
+      fetchImpl,
+    );
+    expect(urls).toContain("https://blog.example.com/hello-post");
+    expect(calls[0]).toContain("/wp-json/wp/v2/posts");
+  });
+});

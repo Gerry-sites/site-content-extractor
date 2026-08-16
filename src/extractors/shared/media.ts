@@ -7,11 +7,15 @@ import type {
   Gallery,
 } from "../../types/schemas.js";
 import { isInternalLink, toAbsoluteUrl, isImageUrl } from "../../utils/url.js";
+import { isSkippableAsset, upgradeMediaUrl } from "../../media/urls.js";
 
-export function extractImages(
-  $: CheerioAPI,
-  pageUrl: string,
-): ExtractedImage[] {
+function resolveImageSrc(src: string, pageUrl: string): string | undefined {
+  const absolute = toAbsoluteUrl(src, pageUrl);
+  if (!absolute || isSkippableAsset(absolute)) return undefined;
+  return upgradeMediaUrl(absolute);
+}
+
+export function extractImages($: CheerioAPI, pageUrl: string): ExtractedImage[] {
   const images: ExtractedImage[] = [];
   const seen = new Set<string>();
 
@@ -23,7 +27,7 @@ export function extractImages(
       $(el).attr("data-original");
     if (!src || src.startsWith("data:")) return;
 
-    const absolute = toAbsoluteUrl(src, pageUrl);
+    const absolute = resolveImageSrc(src, pageUrl);
     if (!absolute || seen.has(absolute)) return;
     seen.add(absolute);
 
@@ -43,7 +47,7 @@ export function extractImages(
     const style = $(el).attr("style") ?? "";
     const match = style.match(/url\(["']?([^"')]+)["']?\)/i);
     if (!match?.[1] || match[1].startsWith("data:")) return;
-    const absolute = toAbsoluteUrl(match[1], pageUrl);
+    const absolute = resolveImageSrc(match[1], pageUrl);
     if (!absolute || seen.has(absolute) || !isImageUrl(absolute)) return;
     seen.add(absolute);
     images.push({ src: absolute, role: "content" });
@@ -52,11 +56,7 @@ export function extractImages(
   return images;
 }
 
-export function extractLinks(
-  $: CheerioAPI,
-  pageUrl: string,
-  seedUrl: string,
-): ExtractedLink[] {
+export function extractLinks($: CheerioAPI, pageUrl: string, seedUrl: string): ExtractedLink[] {
   const links: ExtractedLink[] = [];
   const seen = new Set<string>();
 
@@ -76,10 +76,7 @@ export function extractLinks(
   return links;
 }
 
-export function extractVideos(
-  $: CheerioAPI,
-  pageUrl: string,
-): ExtractedVideo[] {
+export function extractVideos($: CheerioAPI, pageUrl: string): ExtractedVideo[] {
   const videos: ExtractedVideo[] = [];
   const seen = new Set<string>();
 
@@ -114,14 +111,10 @@ export function extractVideos(
   return videos;
 }
 
-export function extractFiles(
-  $: CheerioAPI,
-  pageUrl: string,
-): ExtractedFile[] {
+export function extractFiles($: CheerioAPI, pageUrl: string): ExtractedFile[] {
   const files: ExtractedFile[] = [];
   const seen = new Set<string>();
-  const fileExt =
-    /\.(pdf|zip|docx?|xlsx?|pptx?|csv|txt|mp3|mp4|webm)(?:$|\?)/i;
+  const fileExt = /\.(pdf|zip|docx?|xlsx?|pptx?|csv|txt|mp3|mp4|webm)(?:$|\?)/i;
 
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href");
@@ -129,9 +122,7 @@ export function extractFiles(
     const absolute = toAbsoluteUrl(href, pageUrl);
     if (!absolute || seen.has(absolute)) return;
     seen.add(absolute);
-    const filename = decodeURIComponent(
-      new URL(absolute).pathname.split("/").pop() || "download",
-    );
+    const filename = decodeURIComponent(new URL(absolute).pathname.split("/").pop() || "download");
     files.push({
       href: absolute,
       text: $(el).text().replace(/\s+/g, " ").trim() || undefined,
@@ -162,12 +153,9 @@ export function detectGalleries($: CheerioAPI, pageUrl: string): Gallery[] {
       $(el)
         .find("img")
         .each((__, img) => {
-          const src =
-            $(img).attr("src") ||
-            $(img).attr("data-src") ||
-            $(img).attr("data-lazy-src");
+          const src = $(img).attr("src") || $(img).attr("data-src") || $(img).attr("data-lazy-src");
           if (!src || src.startsWith("data:")) return;
-          const absolute = toAbsoluteUrl(src, pageUrl);
+          const absolute = resolveImageSrc(src, pageUrl);
           if (absolute && !images.includes(absolute)) images.push(absolute);
         });
       if (images.length >= 3) {

@@ -19,8 +19,7 @@ export class XMLParser {
 
   private parseChildren(body: string): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-    const tagRe =
-      /<([A-Za-z_][\w:.-]*)([^>]*)>([\s\S]*?)<\/\1>|<([A-Za-z_][\w:.-]*)([^>]*)\/>/g;
+    const tagRe = /<([A-Za-z_][\w:.-]*)([^>]*)>([\s\S]*?)<\/\1>|<([A-Za-z_][\w:.-]*)([^>]*)\/>/g;
     let match: RegExpExecArray | null;
 
     while ((match = tagRe.exec(body)) !== null) {
@@ -38,9 +37,7 @@ export class XMLParser {
 
       if (name in result) {
         const existing = result[name];
-        result[name] = Array.isArray(existing)
-          ? [...existing, value]
-          : [existing, value];
+        result[name] = Array.isArray(existing) ? [...existing, value] : [existing, value];
       } else {
         result[name] = value;
       }

@@ -1,9 +1,5 @@
 import type { Page } from "playwright";
-import type {
-  ExtractedPage,
-  NavigationItem,
-  SiteMetadata,
-} from "../types/schemas.js";
+import type { ExtractedPage, NavigationItem, SiteMetadata } from "../types/schemas.js";
 import type { PlatformId } from "../types/config.js";
 
 export type ExtractionContext = {

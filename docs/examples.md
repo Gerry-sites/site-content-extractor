@@ -56,3 +56,24 @@ site-migrate https://example.com --json-export --output ./migrations/example
 ```
 
 Produces `content.json` with the full extracted page objects.
+
+## Import into an Astro clone
+
+```bash
+site-migrate import ./migrations/example --target /path/to/astro-clone --locale en
+```
+
+Protected pages (`home`, `about`, `contact`) stay untouched unless `--overwrite-pages`. Flagged images stay out of `public/images/` unless `--include-flagged`.
+
+## Operator live checks
+
+These commands are examples only. Hostnames are **not** encoded in `src/`. After a generic change, optionally run:
+
+```bash
+site-migrate https://www.example.com/ --platform=auto --output ./packs/example --overwrite
+site-migrate https://www.jeffmidghall.com/ --platform=wix --output ./packs/jeff --overwrite
+site-migrate https://www.byserafin.com/ --platform=wix --output ./packs/agatha --overwrite
+site-migrate https://cuisineandart.com/ --platform=wordpress --output ./packs/cuisine --overwrite
+```
+
+Acceptance for a live pack: upgraded `w_1800` JPEGs (not `w_290` thumbs); about/contact text present; WordPress post count in the same ballpark as the live index; originals without `crop=1`; flagged inline illustrations in `image-review.json`. Dry-run import must leave About untouched.

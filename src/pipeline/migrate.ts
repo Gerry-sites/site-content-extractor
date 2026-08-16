@@ -13,15 +13,11 @@ import { downloadImages } from "../download/images.js";
 import { generateMarkdown } from "../markdown/generate.js";
 import { writeReport } from "../reports/generate.js";
 import { validateOutput } from "../validate/markdown.js";
-import {
-  ensureDir,
-  exists,
-  resetDir,
-  writeJson,
-  writeText,
-} from "../utils/fs.js";
+import { ensureDir, exists, resetDir, writeJson, writeText } from "../utils/fs.js";
 import { createLogger } from "../utils/log.js";
 import { uniqueSlug } from "../utils/slug.js";
+import { assignSiteImagePaths } from "../pack/assign.js";
+import { reviewExtractedPages } from "../review/images.js";
 
 export type MigrationResult = {
   report: MigrationReport;
@@ -36,9 +32,7 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
   const outputDir = path.resolve(options.output);
 
   if ((await exists(outputDir)) && !options.resume && !options.overwrite) {
-    throw new Error(
-      `Output directory "${outputDir}" already exists. Use --overwrite or --resume.`,
-    );
+    throw new Error(`Output directory "${outputDir}" already exists. Use --overwrite or --resume.`);
   }
 
   if (options.overwrite && !options.resume) {
@@ -67,15 +61,14 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
       timeoutMs: options.timeoutMs,
       userAgent: options.userAgent,
       verbose: options.verbose,
+      settleMs: options.settleMs,
+      paths: options.paths,
     },
     logger,
   );
 
   // 2. Detect platform using homepage HTML
-  const seedHtml =
-    htmlByUrl.get(manifest.seedUrl) ||
-    htmlByUrl.values().next().value ||
-    "";
+  const seedHtml = htmlByUrl.get(manifest.seedUrl) || htmlByUrl.values().next().value || "";
 
   let platformId = options.platform === "auto" ? "generic" : options.platform;
 
@@ -86,9 +79,7 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
       seedUrl: manifest.seedUrl,
     });
     platformId = detection.platform;
-    logger.info(
-      `Detected: ${detection.name} (confidence ${detection.confidence.toFixed(2)})`,
-    );
+    logger.info(`Detected: ${detection.name} (confidence ${detection.confidence.toFixed(2)})`);
   } else {
     logger.info(`Platform: ${platformId}`);
   }
@@ -173,22 +164,14 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
     );
     brokenImages = downloadResult.broken;
 
-    for (const [remote, downloaded] of downloadResult.byRemoteUrl) {
-      // Markdown lives in pages/blog/portfolio → relative ../images/...
-      imagePathMap.set(remote, `../${downloaded.relativePath}`);
-    }
-
-    // Rewrite metadata asset paths to local
+    // Rewrite metadata asset paths to local pack files
     if (metadata.favicon && downloadResult.byRemoteUrl.has(metadata.favicon)) {
       metadata.favicon = downloadResult.byRemoteUrl.get(metadata.favicon)!.relativePath;
     }
     if (metadata.logo && downloadResult.byRemoteUrl.has(metadata.logo)) {
       metadata.logo = downloadResult.byRemoteUrl.get(metadata.logo)!.relativePath;
     }
-    if (
-      metadata.openGraph?.image &&
-      downloadResult.byRemoteUrl.has(metadata.openGraph.image)
-    ) {
+    if (metadata.openGraph?.image && downloadResult.byRemoteUrl.has(metadata.openGraph.image)) {
       metadata.openGraph.image = downloadResult.byRemoteUrl.get(
         metadata.openGraph.image,
       )!.relativePath;
@@ -197,7 +180,20 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
     logger.info(
       `Images: ${downloadResult.images.length} downloaded, ${brokenImages.length} broken`,
     );
+
+    const organized = await assignSiteImagePaths(
+      extractedPages,
+      downloadResult.byRemoteUrl,
+      outputDir,
+      options.skipBlog,
+    );
+    for (const [remote, sitePath] of organized) {
+      imagePathMap.set(remote, sitePath);
+    }
   }
+
+  const review = reviewExtractedPages(extractedPages, manifest.seedUrl, imagePathMap);
+  await writeJson(path.join(outputDir, "image-review.json"), review);
 
   // 5. Generate markdown
   if (options.markdown) {
@@ -288,18 +284,18 @@ export const collections = { pages, blog };
       "Platform detected as generic. Consider adding a dedicated extractor plugin for cleaner results.",
     );
   }
+  const flagged = review.filter((entry) => entry.flags.length > 0);
   recommendations.push(
-    "Import pages/ and blog/ into an Astro content collection using astro-content.config.example.ts as a starting point.",
+    "Import with `site-migrate import <pack> --target <astro-clone>` after reviewing image-review.json.",
   );
-  recommendations.push(
-    "Manually review Markdown for decorative leftovers and adjust frontmatter as needed.",
-  );
+  if (flagged.length) {
+    recommendations.push(
+      `${flagged.length} images were flagged (chrome, other-host, title-name-in-media, or inline-blog). Import skips them unless --include-flagged.`,
+    );
+  }
 
   const blogPosts = extractedPages.filter((p) => p.isBlogPost).length;
-  const galleries = extractedPages.reduce(
-    (sum, p) => sum + p.galleries.length,
-    0,
-  );
+  const galleries = extractedPages.reduce((sum, p) => sum + p.galleries.length, 0);
 
   const finishedAt = new Date().toISOString();
   const report: MigrationReport = {

@@ -4,11 +4,13 @@ import { genericExtractor } from "./generic/index.js";
 import { wixExtractor } from "./wix/index.js";
 import { webflowExtractor } from "./webflow/index.js";
 import { squarespaceExtractor } from "./squarespace/index.js";
+import { wordpressExtractor } from "./wordpress/index.js";
 
 const extractors: PlatformExtractor[] = [
   wixExtractor,
   webflowExtractor,
   squarespaceExtractor,
+  wordpressExtractor,
   genericExtractor,
 ];
 

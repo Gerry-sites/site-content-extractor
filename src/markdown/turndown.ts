@@ -32,9 +32,7 @@ export function createTurndown(): TurndownService {
       const src = img.getAttribute("src");
       if (!src) return _content;
       const caption =
-        el.querySelector("figcaption")?.textContent?.trim() ||
-        img.getAttribute("alt") ||
-        "";
+        el.querySelector("figcaption")?.textContent?.trim() || img.getAttribute("alt") || "";
       return `\n\n![${caption}](${src})\n\n`;
     },
   });

@@ -33,10 +33,7 @@ export async function detectPlatform(
       platform: "generic",
       name: "Generic HTML",
       confidence: best?.score ?? 0,
-      scores: [
-        ...scores,
-        { id: "generic", name: "Generic HTML", score: 0.1 },
-      ],
+      scores: [...scores, { id: "generic", name: "Generic HTML", score: 0.1 }],
     };
   }
 

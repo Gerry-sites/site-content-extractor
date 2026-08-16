@@ -16,10 +16,7 @@ import {
   pickHeroImage,
 } from "../shared/media.js";
 import { extractBlogMeta, looksLikeBlogPost } from "../shared/blog.js";
-import {
-  extractNavigation,
-  extractSiteMetadata,
-} from "../shared/metadata.js";
+import { extractNavigation, extractSiteMetadata } from "../shared/metadata.js";
 import { pathFromUrl } from "../../utils/url.js";
 import { toSlug } from "../../utils/slug.js";
 import type { ExtractedPage } from "../../types/schemas.js";

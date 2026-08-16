@@ -33,6 +33,14 @@ describe("frontmatter", () => {
     expect(body).toContain("Hello world.");
   });
 
+  it("keeps ISO dates as strings instead of YAML timestamps", () => {
+    const { frontmatter } = parseFrontmatter(
+      "---\ntitle: Coast\nslug: coast\ndate: 1970-01-01\n---\n\nBody.\n",
+    );
+    expect(frontmatter.date).toBe("1970-01-01");
+    expect(typeof frontmatter.date).toBe("string");
+  });
+
   it("returns empty frontmatter when document has none", () => {
     const { frontmatter, body } = parseFrontmatter("# Just content\n");
     expect(frontmatter).toEqual({});

@@ -9,16 +9,11 @@ describe("markdown validation", () => {
   it("fails when title or slug is missing", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "site-migrate-val-"));
     await ensureDir(path.join(dir, "pages"));
-    await writeText(
-      path.join(dir, "pages", "bad.md"),
-      `---\ndescription: nope\n---\n\n# Hi\n`,
-    );
+    await writeText(path.join(dir, "pages", "bad.md"), `---\ndescription: nope\n---\n\n# Hi\n`);
 
     const result = await validateOutput(dir);
     expect(result.ok).toBe(false);
-    expect(
-      result.issues.some((i) => i.message.toLowerCase().includes("title")),
-    ).toBe(true);
+    expect(result.issues.some((i) => i.message.toLowerCase().includes("title"))).toBe(true);
   });
 
   it("passes valid frontmatter with existing images", async () => {
@@ -28,7 +23,7 @@ describe("markdown validation", () => {
     await writeText(path.join(dir, "images", "hero.jpg"), "fake");
     await writeText(
       path.join(dir, "pages", "home.md"),
-      `---\ntitle: Home\nslug: home\nheroImage: images/hero.jpg\n---\n\n# Home\n\n![Hero](../images/hero.jpg)\n`,
+      `---\ntitle: Home\ndescription: Landing\nslug: home\nheroImage: images/hero.jpg\n---\n\n# Home\n\n![Hero](../images/hero.jpg)\n`,
     );
 
     const result = await validateOutput(dir);
@@ -41,10 +36,7 @@ describe("markdown validation", () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "site-migrate-val-"));
     await ensureDir(path.join(dir, "pages"));
     await ensureDir(path.join(dir, "blog"));
-    await writeText(
-      path.join(dir, "pages", "a.md"),
-      `---\ntitle: A\nslug: shared\n---\n\n# A\n`,
-    );
+    await writeText(path.join(dir, "pages", "a.md"), `---\ntitle: A\nslug: shared\n---\n\n# A\n`);
     await writeText(
       path.join(dir, "blog", "b.md"),
       `---\ntitle: B\nslug: shared\nheroImage: images/missing.jpg\n---\n\n# B\n`,
@@ -52,11 +44,9 @@ describe("markdown validation", () => {
 
     const result = await validateOutput(dir);
     expect(result.ok).toBe(false);
-    expect(
-      result.issues.some((i) => i.message.toLowerCase().includes("duplicate slug")),
-    ).toBe(true);
-    expect(
-      result.issues.some((i) => i.message.toLowerCase().includes("missing image")),
-    ).toBe(true);
+    expect(result.issues.some((i) => i.message.toLowerCase().includes("duplicate slug"))).toBe(
+      true,
+    );
+    expect(result.issues.some((i) => i.message.toLowerCase().includes("missing image"))).toBe(true);
   });
 });

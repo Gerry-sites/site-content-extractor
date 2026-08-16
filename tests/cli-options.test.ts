@@ -14,6 +14,8 @@ describe("CLI options schema", () => {
     expect(parsed.respectRobots).toBe(true);
     expect(parsed.concurrency).toBe(3);
     expect(parsed.timeoutMs).toBe(30_000);
+    expect(parsed.settleMs).toBe(2_500);
+    expect(parsed.paths).toEqual(["/about", "/contact"]);
     expect(parsed.skipImages).toBe(false);
   });
 
@@ -31,7 +33,7 @@ describe("CLI options schema", () => {
   });
 
   it("accepts supported platform overrides", () => {
-    for (const platform of ["wix", "webflow", "squarespace", "generic"] as const) {
+    for (const platform of ["wix", "webflow", "squarespace", "generic", "wordpress"] as const) {
       const parsed = CliOptionsSchema.parse({
         url: "https://example.com",
         platform,

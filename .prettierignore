@@ -1,0 +1,12 @@
+dist
+node_modules
+package-lock.json
+packs
+output
+coverage
+*.svg
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.json

@@ -5,9 +5,7 @@ import type { ExtractedPage } from "../types/schemas.js";
  * Platform extractors should do most cleanup; use this layer for
  * cross-cutting concerns (AI cleanup hooks, link rewriting, etc.).
  */
-export type PageTransformer = (
-  page: ExtractedPage,
-) => ExtractedPage | Promise<ExtractedPage>;
+export type PageTransformer = (page: ExtractedPage) => ExtractedPage | Promise<ExtractedPage>;
 
 export async function applyTransformers(
   page: ExtractedPage,

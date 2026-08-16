@@ -2,10 +2,7 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  buildReportMarkdown,
-  writeReport,
-} from "../src/reports/generate.js";
+import { buildReportMarkdown, writeReport } from "../src/reports/generate.js";
 import type { MigrationReport } from "../src/types/schemas.js";
 
 const sampleReport: MigrationReport = {
@@ -39,6 +36,8 @@ describe("migration report", () => {
     expect(md).toContain("## Missing Metadata");
     expect(md).toContain("## Warnings");
     expect(md).toContain("## Recommendations");
+    expect(md).toContain("## Review");
+    expect(md).toContain("image-review.json");
     expect(md).toContain("Platform:** Wix");
   });
 

@@ -2,8 +2,7 @@ import type { CheerioAPI } from "cheerio";
 import type { BlogPostMeta } from "../../types/schemas.js";
 import { toSlug } from "../../utils/slug.js";
 
-const BLOG_URL_HINTS =
-  /\/(blog|post|posts|news|article|articles|journal|stories)\b/i;
+const BLOG_URL_HINTS = /\/(blog|post|posts|news|article|articles|journal|stories)\b/i;
 
 const BLOG_SELECTORS = [
   "article.blog-post",
@@ -29,11 +28,7 @@ export function looksLikeBlogPost(url: string, $: CheerioAPI): boolean {
   return false;
 }
 
-export function extractBlogMeta(
-  $: CheerioAPI,
-  title: string,
-  url: string,
-): BlogPostMeta {
+export function extractBlogMeta($: CheerioAPI, title: string, url: string): BlogPostMeta {
   let date =
     $('meta[property="article:published_time"]').attr("content") ||
     $('meta[name="publish-date"]').attr("content") ||
@@ -80,16 +75,10 @@ export function extractBlogMeta(
             item["@type"] === "BlogPosting" ||
             item["@type"] === "Article" ||
             (Array.isArray(item["@type"]) &&
-              item["@type"].some((t: string) =>
-                ["BlogPosting", "Article"].includes(t),
-              ))
+              item["@type"].some((t: string) => ["BlogPosting", "Article"].includes(t)))
           ) {
             date = date || item.datePublished || item.dateCreated;
-            author =
-              author ||
-              (typeof item.author === "string"
-                ? item.author
-                : item.author?.name);
+            author = author || (typeof item.author === "string" ? item.author : item.author?.name);
             if (item.headline) {
               // prefer JSON-LD headline only if title is weak
             }
@@ -101,11 +90,7 @@ export function extractBlogMeta(
     }
   });
 
-  const pathSlug = url
-    .replace(/\/$/, "")
-    .split("/")
-    .filter(Boolean)
-    .pop();
+  const pathSlug = url.replace(/\/$/, "").split("/").filter(Boolean).pop();
 
   return {
     title,

@@ -29,6 +29,8 @@ export const CliOptionsSchema = z.object({
   respectRobots: z.boolean().default(true),
   concurrency: z.number().int().positive().default(3),
   timeoutMs: z.number().int().positive().default(30_000),
+  settleMs: z.number().int().nonnegative().default(2_500),
+  paths: z.array(z.string()).default(["/about", "/contact"]),
   generateResponsive: z.boolean().default(false),
   jsonExport: z.boolean().default(false),
   userAgent: z
@@ -50,3 +52,16 @@ export type PlatformId =
   | "ghost"
   | "framer"
   | "adobe-portfolio";
+
+export const ImportOptionsSchema = z.object({
+  packs: z.array(z.string()).min(1),
+  target: z.string().min(1),
+  locale: z.string().min(1).default("en"),
+  protectedPages: z.array(z.string()).default(["home", "about", "contact"]),
+  overwritePages: z.boolean().default(false),
+  overwriteEntries: z.boolean().default(false),
+  includeFlagged: z.boolean().default(false),
+  flagInlineBlog: z.boolean().default(true),
+});
+
+export type ImportOptions = z.infer<typeof ImportOptionsSchema>;

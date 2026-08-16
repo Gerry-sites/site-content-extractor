@@ -35,12 +35,7 @@ export async function fetchSitemapUrls(
     for (const entry of nested) {
       const loc = entry?.loc;
       if (typeof loc === "string" && loc.trim()) {
-        const child = await fetchSitemapUrls(
-          loc.trim(),
-          userAgent,
-          fetchImpl,
-          depth + 1,
-        );
+        const child = await fetchSitemapUrls(loc.trim(), userAgent, fetchImpl, depth + 1);
         urls.push(...child);
       }
     }

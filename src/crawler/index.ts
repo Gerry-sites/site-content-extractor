@@ -3,17 +3,16 @@ import pLimit from "p-limit";
 import type { CliOptions } from "../types/config.js";
 import type { DiscoveredPage, PagesManifest } from "../types/schemas.js";
 import { PagesManifestSchema } from "../types/schemas.js";
-import {
-  isAssetUrl,
-  isInternalLink,
-  normalizeUrl,
-  toAbsoluteUrl,
-} from "../utils/url.js";
+import { isAssetUrl, isInternalLink, normalizeUrl, toAbsoluteUrl } from "../utils/url.js";
 import { writeJson, readJson, exists, ensureDir } from "../utils/fs.js";
 import type { Logger } from "../utils/log.js";
 import { loadRobots } from "./robots.js";
 import { fetchSitemapUrls } from "./sitemap.js";
 import path from "node:path";
+import { discoveryFeedUrls, extraSeedUrls, isLowValueCrawlUrl } from "./seeds.js";
+import { discoverFeedUrls } from "./feeds.js";
+import { discoverWordpressPostUrls } from "./wordpress-rest.js";
+import { applyCurrentSrc, injectResourceImages } from "./hydrate.js";
 
 export type CrawlResult = {
   manifest: PagesManifest;
@@ -32,18 +31,41 @@ export type CrawlerOptions = Pick<
   | "timeoutMs"
   | "userAgent"
   | "verbose"
+  | "settleMs"
+  | "paths"
 >;
 
-export async function crawlSite(
-  options: CrawlerOptions,
-  logger: Logger,
-): Promise<CrawlResult> {
+function enqueue(
+  discovered: Map<string, DiscoveredPage>,
+  queue: Array<{ url: string; depth: number; source: DiscoveredPage["source"] }>,
+  raw: string,
+  seedUrl: string,
+  depth: number,
+  source: DiscoveredPage["source"],
+  respectRobots: boolean,
+  isAllowed: (url: string) => boolean,
+) {
+  if (!isInternalLink(raw, seedUrl) || isAssetUrl(raw)) return;
+  if (isLowValueCrawlUrl(raw)) return;
+  const normalized = normalizeUrl(raw, seedUrl);
+  if (discovered.has(normalized)) return;
+  if (respectRobots && !isAllowed(normalized)) return;
+  discovered.set(normalized, {
+    url: raw,
+    normalizedUrl: normalized,
+    depth,
+    source,
+  });
+  queue.push({ url: normalized, depth, source });
+}
+
+export async function crawlSite(options: CrawlerOptions, logger: Logger): Promise<CrawlResult> {
   const seedUrl = normalizeUrl(options.url);
   const manifestPath = path.join(options.output, "pages.json");
   const htmlByUrl = new Map<string, string>();
+  const settleMs = options.settleMs ?? 2_500;
 
-  const queue: Array<{ url: string; depth: number; source: DiscoveredPage["source"] }> =
-    [];
+  const queue: Array<{ url: string; depth: number; source: DiscoveredPage["source"] }> = [];
   const discovered = new Map<string, DiscoveredPage>();
 
   if (options.resume && (await exists(manifestPath))) {
@@ -68,28 +90,35 @@ export async function crawlSite(
   }
 
   const robots = await loadRobots(seedUrl, options.userAgent);
+  const isAllowed = (url: string) => robots.isAllowed(url);
+
   if (options.respectRobots) {
     logger.debug("Loaded robots.txt rules");
   }
 
-  // Seed from sitemaps
+  for (const extra of extraSeedUrls(seedUrl, options.paths)) {
+    enqueue(discovered, queue, extra, seedUrl, 1, "seed", options.respectRobots, isAllowed);
+  }
+
   for (const sitemapUrl of robots.sitemaps) {
     const urls = await fetchSitemapUrls(sitemapUrl, options.userAgent);
     logger.info(`Sitemap ${sitemapUrl}: ${urls.length} URLs`);
     for (const raw of urls) {
-      if (!isInternalLink(raw, seedUrl) || isAssetUrl(raw)) continue;
-      const normalized = normalizeUrl(raw, seedUrl);
-      if (discovered.has(normalized)) continue;
-      if (options.respectRobots && !robots.isAllowed(normalized)) continue;
-      discovered.set(normalized, {
-        url: raw,
-        normalizedUrl: normalized,
-        depth: 1,
-        source: "sitemap",
-      });
-      queue.push({ url: normalized, depth: 1, source: "sitemap" });
+      enqueue(discovered, queue, raw, seedUrl, 1, "sitemap", options.respectRobots, isAllowed);
     }
   }
+
+  const feedUrls = await discoverFeedUrls(seedUrl, discoveryFeedUrls(seedUrl), options.userAgent);
+  for (const raw of feedUrls) {
+    enqueue(discovered, queue, raw, seedUrl, 1, "sitemap", options.respectRobots, isAllowed);
+  }
+  if (feedUrls.length) logger.info(`Feed discovery: ${feedUrls.length} URLs`);
+
+  const restUrls = await discoverWordpressPostUrls(seedUrl, options.userAgent);
+  for (const raw of restUrls) {
+    enqueue(discovered, queue, raw, seedUrl, 1, "sitemap", options.respectRobots, isAllowed);
+  }
+  if (restUrls.length) logger.info(`WordPress REST: ${restUrls.length} URLs`);
 
   let browser: Browser | null = null;
   try {
@@ -121,13 +150,26 @@ export async function crawlSite(
 
             const page = await context.newPage();
             try {
-              const response = await page.goto(item.url, {
-                waitUntil: "domcontentloaded",
-                timeout: options.timeoutMs,
-              });
-              // Allow client-rendered content to settle
+              let response: Awaited<ReturnType<Page["goto"]>> = null;
+              let lastError: unknown;
+              for (let attempt = 1; attempt <= 3; attempt += 1) {
+                try {
+                  response = await page.goto(item.url, {
+                    waitUntil: "domcontentloaded",
+                    timeout: options.timeoutMs,
+                  });
+                  lastError = undefined;
+                  break;
+                } catch (err) {
+                  lastError = err;
+                  if (attempt === 3) throw err;
+                  await new Promise((r) => setTimeout(r, 1_000 * attempt));
+                }
+              }
+              if (lastError) throw lastError;
               await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
-              await new Promise((r) => setTimeout(r, 500));
+              await new Promise((r) => setTimeout(r, settleMs));
+              await clickLoadMore(page, 20);
 
               const status = response?.status();
               const contentType = response?.headers()["content-type"] ?? "";
@@ -148,12 +190,13 @@ export async function crawlSite(
               const title = await page.title();
               if (entry) entry.title = title;
 
-              const html = await page.content();
+              const html = await hydratePageHtml(page);
               htmlByUrl.set(item.url, html);
 
               const links = await collectLinks(page, seedUrl);
               for (const link of links) {
                 if (discovered.has(link)) continue;
+                if (isLowValueCrawlUrl(link)) continue;
                 if (options.respectRobots && !robots.isAllowed(link)) continue;
                 const nextDepth = item.depth + 1;
                 if (nextDepth > options.depth) continue;
@@ -191,9 +234,7 @@ export async function crawlSite(
   const manifest: PagesManifest = {
     seedUrl,
     crawledAt: new Date().toISOString(),
-    pages: [...discovered.values()].sort((a, b) =>
-      a.normalizedUrl.localeCompare(b.normalizedUrl),
-    ),
+    pages: [...discovered.values()].sort((a, b) => a.normalizedUrl.localeCompare(b.normalizedUrl)),
   };
 
   await ensureDir(options.output);
@@ -201,6 +242,41 @@ export async function crawlSite(
   logger.info(`Wrote ${manifest.pages.length} pages to pages.json`);
 
   return { manifest, htmlByUrl };
+}
+
+async function hydratePageHtml(page: Page): Promise<string> {
+  const snapshot = await page.evaluate(() => {
+    const imgs = Array.from(document.querySelectorAll("img")).map((img) => ({
+      src: img.getAttribute("src") || undefined,
+      currentSrc: (img as HTMLImageElement).currentSrc || undefined,
+    }));
+    const resources = performance
+      .getEntriesByType("resource")
+      .map((entry) => entry.name)
+      .filter((name) => /wixstatic|wp\.com|wp-content|wordpress\.com/i.test(name));
+    return { imgs, resources };
+  });
+  let html = await page.content();
+  html = applyCurrentSrc(html, snapshot.imgs);
+  html = injectResourceImages(html, snapshot.resources);
+  return html;
+}
+
+async function clickLoadMore(page: Page, maxClicks: number): Promise<void> {
+  for (let i = 0; i < maxClicks; i += 1) {
+    const clicked = await page.evaluate((reSource) => {
+      const re = new RegExp(reSource, "i");
+      const candidates = Array.from(
+        document.querySelectorAll("button, a, [role='button']"),
+      ) as HTMLElement[];
+      const target = candidates.find((el) => re.test((el.textContent || "").replace(/\s+/g, " ")));
+      if (!target) return false;
+      target.click();
+      return true;
+    }, "load more|show more|more posts|see more");
+    if (!clicked) break;
+    await new Promise((r) => setTimeout(r, 800));
+  }
 }
 
 async function collectLinks(page: Page, seedUrl: string): Promise<string[]> {
