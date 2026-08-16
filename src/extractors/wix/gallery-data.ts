@@ -1,3 +1,5 @@
+import { wixMediaId } from "../../media/urls.js";
+
 export type WixGalleryItemMeta = {
   mediaUrl: string;
   title?: string;
@@ -74,13 +76,43 @@ export function matchWixGalleryItem(
   src: string,
   items: WixGalleryItemMeta[],
 ): WixGalleryItemMeta | undefined {
-  const decoded = decodePath(src);
+  const srcId = wixMediaId(src);
+  if (srcId) {
+    const exact = items.find((item) => wixMediaId(item.mediaUrl) === srcId);
+    if (exact) return exact;
+  }
+  const srcFile = mediaFileName(src);
   return items.find((item) => {
-    if (!item.mediaUrl) return false;
-    if (src.includes(item.mediaUrl) || decoded.includes(item.mediaUrl)) return true;
-    const mediaFile = mediaFileName(item.mediaUrl);
-    return Boolean(mediaFile) && decoded.toLowerCase().includes(mediaFile);
+    const itemFile = mediaFileName(item.mediaUrl);
+    return Boolean(itemFile) && srcFile === itemFile;
   });
+}
+
+/** Keep Wix Pro Gallery order so titles stay on the same works as on the source site. */
+export function orderImagesByWixGallery<T extends { src: string }>(
+  images: T[],
+  items: WixGalleryItemMeta[],
+): T[] {
+  const byId = new Map<string, T>();
+  for (const img of images) {
+    const id = wixMediaId(img.src);
+    if (id && !byId.has(id)) byId.set(id, img);
+  }
+  const ordered: T[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    const id = wixMediaId(item.mediaUrl);
+    const img = id ? byId.get(id) : undefined;
+    if (!img || seen.has(img.src)) continue;
+    seen.add(img.src);
+    ordered.push(img);
+  }
+  for (const img of images) {
+    if (seen.has(img.src)) continue;
+    seen.add(img.src);
+    ordered.push(img);
+  }
+  return ordered;
 }
 
 export function applyWixGalleryMetadata<T extends { src: string; alt?: string }>(

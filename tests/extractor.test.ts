@@ -192,6 +192,55 @@ describe("wix extractor", () => {
     expect(sketch?.title).toBe("After The Flood sketch");
     expect(sketch?.caption).toBeUndefined();
   });
+
+  it("keeps Wix work titles on the warmup item even when the DOM is reversed", async () => {
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="generator" content="Wix.com Website Builder" />
+    <title>Portraits</title>
+    <script type="application/json" id="wix-warmup-data">${JSON.stringify({
+      pages: {
+        appsWarmupData: {
+          tpa: {
+            "comp-gallery_galleryData": {
+              items: [
+                {
+                  mediaUrl: "bfe860_doctor~mv2.jpg",
+                  metaData: { title: "Doctor - Patient" },
+                },
+                {
+                  mediaUrl: "bfe860_father~mv2.jpg",
+                  metaData: { title: "My Father" },
+                },
+              ],
+            },
+          },
+        },
+      },
+    })}</script>
+  </head>
+  <body>
+    <div id="SITE_PAGES">
+      <div data-testid="pro-gallery">
+        <img src="https://static.wixstatic.com/media/bfe860_father~mv2.jpg/v1/fill/w_322,h_322,q_90/b.jpg" alt="" />
+        <img src="https://static.wixstatic.com/media/bfe860_doctor~mv2.jpg/v1/fill/w_323,h_322,q_90/a.jpg" alt="" />
+        <img src="https://static.wixstatic.com/media/bfe860_other~mv2.jpg/v1/fill/w_322,h_322,q_90/c.jpg" alt="" />
+      </div>
+    </div>
+  </body>
+</html>`;
+    const page = await wixExtractor.extractPage({
+      url: "https://studio.example.com/portraits",
+      html,
+      seedUrl: "https://studio.example.com/",
+    });
+    expect(page.images[0]?.title).toBe("Doctor - Patient");
+    expect(page.heroImage).toContain("bfe860_doctor~mv2.jpg");
+    expect(page.galleries[0]?.images[0]).toContain("bfe860_doctor~mv2.jpg");
+    expect(page.galleries[0]?.images[1]).toContain("bfe860_father~mv2.jpg");
+    expect(page.images.find((img) => img.src.includes("father"))?.title).toBe("My Father");
+  });
 });
 
 describe("wordpress extractor", () => {

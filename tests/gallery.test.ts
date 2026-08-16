@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { captionsNeedMerge, mergeGalleryCaptions } from "../src/pack/gallery.js";
-import { extractWixGalleryItems, matchWixGalleryItem } from "../src/extractors/wix/gallery-data.js";
+import {
+  extractWixGalleryItems,
+  matchWixGalleryItem,
+  orderImagesByWixGallery,
+} from "../src/extractors/wix/gallery-data.js";
 
 describe("gallery captions", () => {
   it("merges pack titles and captions onto an existing string gallery", () => {
@@ -90,6 +94,37 @@ describe("Wix warmup gallery metadata", () => {
     const encoded =
       "https://static.wixstatic.com/media/bfe860_cc280acbdadf439b85e9d4d898cf244e%7Emv2.jpg/v1/fit/w_1800/a.jpg";
     expect(matchWixGalleryItem(encoded, items)?.title).toBe("After The Flood");
+  });
+
+  it("does not attach another work's title because one media id contains another", () => {
+    const items = [
+      {
+        mediaUrl: "bfe860_aa~mv2.jpg",
+        title: "Short id",
+      },
+      {
+        mediaUrl: "bfe860_aabbcc~mv2.jpg",
+        title: "Longer id",
+      },
+    ];
+    const src =
+      "https://static.wixstatic.com/media/bfe860_aabbcc~mv2.jpg/v1/fit/w_1800,h_1800/bfe860_aabbcc~mv2.jpg";
+    expect(matchWixGalleryItem(src, items)?.title).toBe("Longer id");
+  });
+
+  it("orders extracted images to follow the Wix gallery, not the DOM", () => {
+    const items = [
+      { mediaUrl: "bfe860_second~mv2.jpg", title: "Second" },
+      { mediaUrl: "bfe860_first~mv2.jpg", title: "First" },
+    ];
+    const images = [
+      { src: "https://static.wixstatic.com/media/bfe860_first~mv2.jpg/v1/fit/w_1800/a.jpg" },
+      { src: "https://static.wixstatic.com/media/bfe860_second~mv2.jpg/v1/fit/w_1800/b.jpg" },
+    ];
+    expect(orderImagesByWixGallery(images, items).map((img) => img.src)).toEqual([
+      images[1]!.src,
+      images[0]!.src,
+    ]);
   });
 });
 

@@ -2,7 +2,7 @@ import path from "node:path";
 import { copyFile } from "node:fs/promises";
 import type { ExtractedPage } from "../types/schemas.js";
 import type { DownloadedImage } from "../download/images.js";
-import { ensureDir, exists } from "../utils/fs.js";
+import { ensureDir, filesEqual } from "../utils/fs.js";
 import { isSkippableAsset, upgradeMediaUrl } from "../media/urls.js";
 import {
   extFromPath,
@@ -71,7 +71,7 @@ export async function assignSiteImagePaths(
       }
       const dest = path.join(outputDir, packFileFromSitePath(sitePath));
       await ensureDir(path.dirname(dest));
-      if (!(await exists(dest))) {
+      if (!(await filesEqual(downloaded.localPath, dest))) {
         await copyFile(downloaded.localPath, dest);
       }
     }

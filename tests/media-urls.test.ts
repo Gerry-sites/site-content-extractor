@@ -27,6 +27,12 @@ describe("Wix media URLs", () => {
     expect(wixMediaId(WIX_THUMB)).toBe("bfe860_0d0b5336d5cf49f8930f57ebbcc619af~mv2.jpg");
   });
 
+  it("treats a percent-encoded tilde as the same Wix media id", () => {
+    const encoded =
+      "https://static.wixstatic.com/media/bfe860_cc280acbdadf439b85e9d4d898cf244e%7Emv2.jpg/v1/fit/w_1800/a.jpg";
+    expect(wixMediaId(encoded)).toBe("bfe860_cc280acbdadf439b85e9d4d898cf244e~mv2.jpg");
+  });
+
   it("upgrades Wix ids that include extra _s_N_N dimension suffixes", () => {
     const url =
       "https://static.wixstatic.com/media/21b326_ab2a8358d70c4fe4839bf661f8f241cf~mv2_d_8660_5773_s_4_2.jpg/v1/fit/w_650,h_433,q_90,enc_avif,quality_auto/21b326_ab2a8358d70c4fe4839bf661f8f241cf~mv2_d_8660_5773_s_4_2.jpg";

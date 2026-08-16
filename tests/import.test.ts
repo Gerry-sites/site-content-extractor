@@ -205,6 +205,53 @@ describe("Astro import", () => {
     expect(filled).not.toContain("COAST | Studio");
   });
 
+  it("replaces a clone image when the pack file for the same src is a different work", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "site-migrate-import-realign-"));
+    const pack = path.join(root, "pack");
+    const target = path.join(root, "site");
+    const actor = Buffer.from("actor-bytes");
+    const father = Buffer.from("father-bytes");
+
+    await write(path.join(target, "src/content/config.ts"), "export const collections = {}");
+    await write(
+      path.join(target, "src/content/portfolio/en/portraits.md"),
+      "---\ntitle: Portraits\ndescription: Kept\ndate: 2019-01-01\nheroImage: /images/portfolio/portraits-hero.jpg\ngallery:\n  - src: /images/portfolio/portraits-1.jpg\n    title: My Father\ncategories:\n  - Painting\n---\n\nClone body.\n",
+    );
+    await mkdir(path.join(target, "public/images/portfolio"), { recursive: true });
+    await writeFile(path.join(target, "public/images/portfolio/portraits-hero.jpg"), PNG);
+    await writeFile(path.join(target, "public/images/portfolio/portraits-1.jpg"), actor);
+
+    await write(
+      path.join(pack, "portfolio/portraits.md"),
+      "---\ntitle: Portraits\ndescription: Pack\nslug: portraits\ndate: 1970-01-01\nheroImage: /images/portfolio/portraits-hero.jpg\ngallery:\n  - src: /images/portfolio/portraits-1.jpg\n    title: My Father\n---\n\nPack body.\n",
+    );
+    await mkdir(path.join(pack, "images/portfolio"), { recursive: true });
+    await writeFile(path.join(pack, "images/portfolio/portraits-hero.jpg"), PNG);
+    await writeFile(path.join(pack, "images/portfolio/portraits-1.jpg"), father);
+
+    const summary = await importPacks({
+      packs: [pack],
+      target,
+      locale: "en",
+      protectedPages: ["home", "about", "contact"],
+      overwritePages: false,
+      overwriteEntries: false,
+      includeFlagged: false,
+      flagInlineBlog: true,
+    });
+
+    expect(summary.filledImages).toContain("portfolio/portraits");
+    expect(summary.skippedExisting).not.toContain("portfolio/portraits");
+    const dest = await readFile(path.join(target, "public/images/portfolio/portraits-1.jpg"));
+    expect(dest.equals(father)).toBe(true);
+    const filled = await readFile(
+      path.join(target, "src/content/portfolio/en/portraits.md"),
+      "utf8",
+    );
+    expect(filled).toContain("Clone body");
+    expect(filled).toContain("title: My Father");
+  });
+
   it("does not import a protected slug from portfolio", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "site-migrate-import-home-"));
     const pack = path.join(root, "pack");

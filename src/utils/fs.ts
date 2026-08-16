@@ -14,6 +14,12 @@ export async function exists(filePath: string): Promise<boolean> {
   }
 }
 
+export async function filesEqual(left: string, right: string): Promise<boolean> {
+  if (!(await exists(left)) || !(await exists(right))) return false;
+  const [a, b] = await Promise.all([readFile(left), readFile(right)]);
+  return a.equals(b);
+}
+
 export async function writeJson(filePath: string, data: unknown, pretty = true): Promise<void> {
   await ensureDir(path.dirname(filePath));
   const body = pretty ? JSON.stringify(data, null, 2) + "\n" : JSON.stringify(data);

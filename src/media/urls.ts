@@ -13,7 +13,13 @@ const WIX_MEDIA_ID = /([a-z0-9]+_[a-z0-9]+~mv2(?:_d_\d+_\d+_s_[\d_]+)?\.(?:jpg|j
 const SIZE_QUERY_KEYS = ["w", "h", "crop", "resize", "fit", "quality", "q", "ssl", "strip"];
 
 export function wixMediaId(urlOrId: string): string | undefined {
-  const match = String(urlOrId).match(WIX_MEDIA_ID);
+  let value = String(urlOrId);
+  try {
+    value = decodeURIComponent(value);
+  } catch {
+    /* keep the raw value when it is not URI-encoded */
+  }
+  const match = value.match(WIX_MEDIA_ID);
   return match ? match[1]!.toLowerCase() : undefined;
 }
 

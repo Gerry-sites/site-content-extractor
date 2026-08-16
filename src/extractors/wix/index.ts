@@ -20,7 +20,11 @@ import { extractNavigation, extractSiteMetadata } from "../shared/metadata.js";
 import { pathFromUrl } from "../../utils/url.js";
 import { toSlug } from "../../utils/slug.js";
 import type { ExtractedPage } from "../../types/schemas.js";
-import { applyWixGalleryMetadata } from "./gallery-data.js";
+import {
+  applyWixGalleryMetadata,
+  extractWixGalleryItems,
+  orderImagesByWixGallery,
+} from "./gallery-data.js";
 
 function isInfoRoute(url: string): boolean {
   try {
@@ -136,12 +140,16 @@ export const wixExtractor: PlatformExtractor = {
     for (const img of [...pageImages, ...preChromeImages]) {
       if (!mergedImages.some((m) => m.src === img.src)) mergedImages.push(img);
     }
+    const warmupItems = extractWixGalleryItems(ctx.html);
     mergedImages = applyWixGalleryMetadata(mergedImages, ctx.html);
+    if (warmupItems.length) {
+      mergedImages = orderImagesByWixGallery(mergedImages, warmupItems);
+    }
 
     const links = extractLinks($main, ctx.url, ctx.seedUrl);
     const videos = extractVideos($main, ctx.url);
     const files = extractFiles($main, ctx.url);
-    const galleries = detectGalleries($main, ctx.url);
+    let galleries = detectGalleries($main, ctx.url);
     // Wix pro-gallery often outside cleaned main
     const pageGalleries = detectGalleries($, ctx.url);
     for (const g of [...pageGalleries, ...preChromeGalleries]) {
@@ -149,9 +157,15 @@ export const wixExtractor: PlatformExtractor = {
         galleries.push(g);
       }
     }
+    if (warmupItems.length) {
+      const orderedSrcs = mergedImages.map((img) => img.src);
+      if (orderedSrcs.length) galleries = [{ images: orderedSrcs }];
+    }
 
     const headings = extractHeadings($main);
-    const heroImage = pickHeroImage($, ctx.url, mergedImages);
+    const heroImage = warmupItems.length
+      ? mergedImages[0]?.src
+      : pickHeroImage($, ctx.url, mergedImages);
     const isBlog =
       looksLikeBlogPost(ctx.url, $) ||
       /\/post\//i.test(ctx.url) ||

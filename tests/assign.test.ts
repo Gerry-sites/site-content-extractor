@@ -82,4 +82,51 @@ describe("assignSiteImagePaths", () => {
       ?.get("https://static.wixstatic.com/media/other.jpg");
     expect(landscapeOther).toBe("/images/portfolio/landscape-1.jpg");
   });
+
+  it("replaces an assigned file when a later extract maps a different work onto the same site path", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "site-migrate-assign-overwrite-"));
+    const first = path.join(root, "first.jpg");
+    const second = path.join(root, "second.jpg");
+    await writeFile(first, Buffer.from("first-work"));
+    await writeFile(second, Buffer.from("second-work"));
+    const remote = "https://static.wixstatic.com/media/bfe860_work~mv2.jpg";
+
+    const page = galleryPage("https://studio.example.com/portraits", "portraits", [remote]);
+    await assignSiteImagePaths(
+      [page],
+      new Map([
+        [
+          remote,
+          {
+            remoteUrl: remote,
+            localPath: first,
+            relativePath: "images/_raw/first.jpg",
+            hash: "one",
+            bytes: 10,
+          },
+        ],
+      ]),
+      root,
+    );
+    const dest = path.join(root, "images/portfolio/portraits-hero.jpg");
+    expect(await readFile(dest, "utf8")).toBe("first-work");
+
+    await assignSiteImagePaths(
+      [page],
+      new Map([
+        [
+          remote,
+          {
+            remoteUrl: remote,
+            localPath: second,
+            relativePath: "images/_raw/second.jpg",
+            hash: "two",
+            bytes: 11,
+          },
+        ],
+      ]),
+      root,
+    );
+    expect(await readFile(dest, "utf8")).toBe("second-work");
+  });
 });

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import yaml from "js-yaml";
-import { exists } from "../utils/fs.js";
+import { exists, filesEqual } from "../utils/fs.js";
 import { parseFrontmatter } from "../markdown/frontmatter.js";
 import type { ImageReviewEntry } from "../review/images.js";
 import { isSkippedOnImport } from "../review/images.js";
@@ -98,6 +98,27 @@ async function referencedImageMissing(
   return false;
 }
 
+async function destImagesDifferFromPack(
+  packRoot: string,
+  targetRoot: string,
+  frontmatter: Record<string, unknown>,
+  body: string,
+  skippedSitePaths: Set<string>,
+): Promise<boolean> {
+  const refs = extractImageRefs(body, frontmatter).map((ref) =>
+    ref.startsWith("/") ? ref : `/${ref}`,
+  );
+  for (const sitePath of refs) {
+    if (skippedSitePaths.has(sitePath)) continue;
+    const from = path.join(packRoot, packFileFromSitePath(sitePath));
+    const to = path.join(targetRoot, "public", packFileFromSitePath(sitePath));
+    if (!(await exists(from))) continue;
+    if (!(await exists(to))) return true;
+    if (!(await filesEqual(from, to))) return true;
+  }
+  return false;
+}
+
 export async function importPacks(options: ImportOptions): Promise<ImportSummary> {
   const targetRoot = path.resolve(options.target);
   const configPath = path.join(targetRoot, "src/content/config.ts");
@@ -181,11 +202,18 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
               typeof existing.frontmatter.heroCaption !== "string") ||
             (typeof fm.heroTitle === "string" &&
               typeof existing.frontmatter.heroTitle !== "string");
-          if (!missing && !captionMerge) {
+          const imageDrift = await destImagesDifferFromPack(
+            packRoot,
+            targetRoot,
+            parsed.frontmatter,
+            parsed.body,
+            skippedSitePaths,
+          );
+          if (!missing && !captionMerge && !imageDrift) {
             summary.skippedExisting.push(`${collection}/${slug}`);
             continue;
           }
-          if (missing) {
+          if (missing || imageDrift) {
             await copyEntryImages(
               packRoot,
               targetRoot,
@@ -199,38 +227,42 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
             (typeof existing.frontmatter.heroImage === "string" &&
               existing.frontmatter.heroImage) ||
             packHero;
-          const mergedGallery = mergeGalleryCaptions(
-            galleryWithoutHero(existingHero, [
-              asGalleryEntries(existing.frontmatter.gallery),
-              asGalleryEntries(fm.gallery),
-            ]),
-            asGalleryEntries(fm.gallery),
-          );
+          const mergedGallery = imageDrift
+            ? asGalleryEntries(fm.gallery)
+            : mergeGalleryCaptions(
+                galleryWithoutHero(existingHero, [
+                  asGalleryEntries(existing.frontmatter.gallery),
+                  asGalleryEntries(fm.gallery),
+                ]),
+                asGalleryEntries(fm.gallery),
+              );
           const merged: Record<string, unknown> = {
             ...existing.frontmatter,
-            heroImage: missing
-              ? (packHero ?? existing.frontmatter.heroImage)
-              : (existing.frontmatter.heroImage ?? packHero),
+            heroImage:
+              missing || imageDrift
+                ? (packHero ?? existing.frontmatter.heroImage)
+                : (existing.frontmatter.heroImage ?? packHero),
             gallery: mergedGallery,
           };
           if (
-            typeof existing.frontmatter.heroTitle !== "string" &&
-            typeof fm.heroTitle === "string"
+            imageDrift ||
+            (typeof existing.frontmatter.heroTitle !== "string" && typeof fm.heroTitle === "string")
           ) {
-            merged.heroTitle = fm.heroTitle;
+            if (typeof fm.heroTitle === "string") merged.heroTitle = fm.heroTitle;
           }
           if (
-            typeof existing.frontmatter.heroCaption !== "string" &&
-            typeof fm.heroCaption === "string"
+            imageDrift ||
+            (typeof existing.frontmatter.heroCaption !== "string" &&
+              typeof fm.heroCaption === "string")
           ) {
-            merged.heroCaption = fm.heroCaption;
+            if (typeof fm.heroCaption === "string") merged.heroCaption = fm.heroCaption;
           }
           delete merged.slug;
           delete merged.sourceUrl;
           await mkdir(destDir, { recursive: true });
           await writeFile(destFile, serializeImported(merged, existing.body), "utf8");
-          if (missing) summary.filledImages.push(`${collection}/${slug}`);
-          if (captionMerge) summary.filledCaptions.push(`${collection}/${slug}`);
+          if (missing || imageDrift) summary.filledImages.push(`${collection}/${slug}`);
+          if (captionMerge || imageDrift) summary.filledCaptions.push(`${collection}/${slug}`);
           continue;
         }
 
