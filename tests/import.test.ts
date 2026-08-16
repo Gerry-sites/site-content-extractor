@@ -158,6 +158,53 @@ describe("Astro import", () => {
     expect(imported).not.toContain("Midghall");
   });
 
+  it("fills missing work captions on existing entries without replacing the body", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "site-migrate-import-captions-"));
+    const pack = path.join(root, "pack");
+    const target = path.join(root, "site");
+
+    await write(path.join(target, "src/content/config.ts"), "export const collections = {}");
+    await write(
+      path.join(target, "src/content/portfolio/en/coast.md"),
+      "---\ntitle: Coast\ndescription: Kept\ndate: 2018-04-01\nheroImage: /images/portfolio/coast-hero.jpg\ngallery:\n  - /images/portfolio/coast-1.jpg\ncategories:\n  - Painting\nmedium: Oil\n---\n\nClone body.\n",
+    );
+    await mkdir(path.join(target, "public/images/portfolio"), { recursive: true });
+    await writeFile(path.join(target, "public/images/portfolio/coast-hero.jpg"), PNG);
+    await writeFile(path.join(target, "public/images/portfolio/coast-1.jpg"), PNG);
+
+    await write(
+      path.join(pack, "portfolio/coast.md"),
+      "---\ntitle: COAST | Studio\ndescription: Chrome\nslug: coast\ndate: 1970-01-01\nheroImage: /images/portfolio/coast-hero.jpg\nheroTitle: Coast painting\nheroCaption: Oil on canvas, 100 cm x 70 cm. A symbolic work.\ngallery:\n  - src: /images/portfolio/coast-1.jpg\n    title: Coast sketch\n---\n\nPack body.\n",
+    );
+    await mkdir(path.join(pack, "images/portfolio"), { recursive: true });
+    await writeFile(path.join(pack, "images/portfolio/coast-hero.jpg"), PNG);
+    await writeFile(path.join(pack, "images/portfolio/coast-1.jpg"), PNG);
+
+    const summary = await importPacks({
+      packs: [pack],
+      target,
+      locale: "en",
+      protectedPages: ["home", "about", "contact"],
+      overwritePages: false,
+      overwriteEntries: false,
+      includeFlagged: false,
+      flagInlineBlog: true,
+    });
+
+    expect(summary.filledCaptions).toContain("portfolio/coast");
+    expect(summary.filledImages).not.toContain("portfolio/coast");
+    expect(summary.skippedExisting).not.toContain("portfolio/coast");
+
+    const filled = await readFile(path.join(target, "src/content/portfolio/en/coast.md"), "utf8");
+    expect(filled).toContain("title: Coast");
+    expect(filled).toContain("Clone body");
+    expect(filled).toContain("medium: Oil");
+    expect(filled).toContain("heroCaption: Oil on canvas, 100 cm x 70 cm");
+    expect(filled).toContain("title: Coast sketch");
+    expect(filled).not.toContain("Pack body");
+    expect(filled).not.toContain("COAST | Studio");
+  });
+
   it("does not import a protected slug from portfolio", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "site-migrate-import-home-"));
     const pack = path.join(root, "pack");

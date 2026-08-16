@@ -162,7 +162,8 @@ describe("markdown generation", () => {
     const page: ExtractedPage = {
       url: "https://studio.example.com/printmaking",
       title: "PRINTMAKING | Studio",
-      description: "PRINTMAKING MOVEMENT I This project on Movement started soon after returning from a trip.",
+      description:
+        "PRINTMAKING MOVEMENT I This project on Movement started soon after returning from a trip.",
       slug: "printmaking",
       headings: [],
       htmlContent: `<h1><a href="/">PRINTMAKING</a></h1><h2>2016</h2><p>The Movement project started after a trip.</p><img src="https://cdn.example.com/18.jpg" alt="" />`,
@@ -201,5 +202,58 @@ describe("markdown generation", () => {
     expect(body).not.toContain("## 2016");
     expect(body).not.toContain("printmaking-18.jpg");
     expect(body).not.toMatch(/^# \[PRINTMAKING\]/m);
+  });
+
+  it("emits per-work titles and captions from extracted image metadata", () => {
+    const page: ExtractedPage = {
+      url: "https://studio.example.com/after-the-flood",
+      title: "After the Flood",
+      description: "Series",
+      slug: "after-the-flood",
+      headings: [],
+      htmlContent: "<p>Series notes.</p>",
+      images: [
+        {
+          src: "https://cdn.example.com/hero.jpg",
+          role: "gallery",
+          title: "After The Flood",
+          caption: "Oil on canvas, 100 cm x 70 cm. A symbolic work.",
+        },
+        {
+          src: "https://cdn.example.com/sketch.jpg",
+          role: "gallery",
+          title: "After The Flood sketch",
+        },
+      ],
+      links: [],
+      videos: [],
+      files: [],
+      galleries: [
+        {
+          images: ["https://cdn.example.com/hero.jpg", "https://cdn.example.com/sketch.jpg"],
+        },
+      ],
+      isBlogPost: false,
+      kind: "gallery",
+      heroImage: "https://cdn.example.com/hero.jpg",
+    };
+    const result = generateMarkdown(
+      page,
+      new Map([
+        ["https://cdn.example.com/hero.jpg", "/images/portfolio/after-the-flood-hero.jpg"],
+        ["https://cdn.example.com/sketch.jpg", "/images/portfolio/after-the-flood-1.jpg"],
+      ]),
+    );
+    const { frontmatter } = parseFrontmatter(result.content);
+    expect(frontmatter.heroImage).toBe("/images/portfolio/after-the-flood-hero.jpg");
+    expect(frontmatter.heroTitle).toBe("After The Flood");
+    expect(frontmatter.heroCaption).toContain("Oil on canvas, 100 cm x 70 cm");
+    expect(frontmatter.gallery).toEqual([
+      {
+        src: "/images/portfolio/after-the-flood-1.jpg",
+        title: "After The Flood sketch",
+      },
+    ]);
+    expect(result.content).toContain("Oil on canvas, 100 cm x 70 cm");
   });
 });

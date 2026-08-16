@@ -15,11 +15,17 @@ export function polishTitle(title: string): string {
   if (!letters || /[a-z]/.test(stripped)) return stripped;
   return stripped
     .toLowerCase()
-    .replace(/(^|[^a-z0-9])([a-z])/g, (_, prefix: string, char: string) => prefix + char.toUpperCase());
+    .replace(
+      /(^|[^a-z0-9])([a-z])/g,
+      (_, prefix: string, char: string) => prefix + char.toUpperCase(),
+    );
 }
 
 export function looksLikeChromeDescription(text: string): boolean {
-  const trimmed = text.replace(/\u200b/g, "").replace(/\s+/g, " ").trim();
+  const trimmed = text
+    .replace(/\u200b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!trimmed) return true;
   if (/click to see larger/i.test(trimmed)) return true;
   if (/^(above|below)\s*\/\s+\S/i.test(trimmed) && trimmed.length < 140) return true;
@@ -55,7 +61,12 @@ export function firstProseParagraph(text: string): string | undefined {
   const blocks = text
     .replace(/\u200b/g, "")
     .split(/\n{2,}/)
-    .map((block) => block.replace(/^#{1,6}\s+/, "").replace(/\s+/g, " ").trim())
+    .map((block) =>
+      block
+        .replace(/^#{1,6}\s+/, "")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
     .filter(Boolean);
   for (const block of blocks) {
     const prose = block
@@ -70,13 +81,12 @@ export function firstProseParagraph(text: string): string | undefined {
   return undefined;
 }
 
-export function polishDescription(
-  text: string | undefined,
-  body: string,
-  title: string,
-): string {
+export function polishDescription(text: string | undefined, body: string, title: string): string {
   const fallback = firstProseParagraph(body) || polishTitle(title);
-  const fromField = (text ?? "").replace(/\u200b/g, " ").replace(/\s+/g, " ").trim();
+  const fromField = (text ?? "")
+    .replace(/\u200b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!fromField || looksLikeChromeDescription(fromField) || looksLikeGluedDescription(fromField)) {
     return fallback.slice(0, 180);
   }
@@ -90,10 +100,7 @@ export function yearFromHeadings(text: string): string | undefined {
 
 export function stripYearHeadings(body: string): string {
   return body
-    .replace(
-      /^#{1,6}\s*((?:19|20)\d{2})(?:\s*[-–—]\s*(?:[Oo]ngoing|(?:19|20)\d{2}))?\s*$/gm,
-      "",
-    )
+    .replace(/^#{1,6}\s*((?:19|20)\d{2})(?:\s*[-–—]\s*(?:[Oo]ngoing|(?:19|20)\d{2}))?\s*$/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -101,8 +108,9 @@ export function stripYearHeadings(body: string): string {
 export function cleanMarkdownBody(body: string, title?: string): string {
   let next = body.replace(/\u200b/g, "");
   next = next.replace(/^#{1,6}\s+\[[^\]]*\]\([^)]+\)\s*$/gm, "");
-  next = next.replace(/^[-*]\s+\[[^\]]*\]\((https?:\/\/[^)]+|mailto:[^)]+)\)\s*$/gm, (line, href) =>
-    isSocialOrMailHref(href) ? "" : line,
+  next = next.replace(
+    /^[-*]\s+\[[^\]]*\]\((https?:\/\/[^)]+|mailto:[^)]+)\)\s*$/gm,
+    (line, href) => (isSocialOrMailHref(href) ? "" : line),
   );
   next = next.replace(/^#{1,6}\s*$/gm, "");
   next = next.replace(/^#{1,6}\s+(.+)$/gm, (full, content: string) => {
@@ -138,26 +146,7 @@ export function localImagePaths(markdown: string): string[] {
   return found;
 }
 
-export function galleryWithoutHero(
-  hero: string | undefined,
-  galleries: Array<string[] | undefined>,
-): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const list of galleries) {
-    if (!list) continue;
-    for (const item of list) {
-      if (typeof item !== "string") continue;
-      const src = item.split("?")[0];
-      if (!src.startsWith("/images/")) continue;
-      if (hero && src === hero) continue;
-      if (seen.has(src)) continue;
-      seen.add(src);
-      out.push(src);
-    }
-  }
-  return out;
-}
+export { galleryWithoutHero } from "../pack/gallery.js";
 
 export function stripLocalImageEmbeds(body: string, locals: string[]): string {
   let next = body;

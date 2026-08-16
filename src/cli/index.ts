@@ -140,6 +140,7 @@ program
       console.log(`  Protected skipped:${summary.skippedProtected.length}`);
       console.log(`  Existing skipped: ${summary.skippedExisting.length}`);
       console.log(`  Filled images:    ${summary.filledImages.length}`);
+      console.log(`  Filled captions:  ${summary.filledCaptions.length}`);
       console.log(`  Images copied:    ${summary.copiedImages}`);
       console.log(`  Flagged skipped:  ${summary.skippedFlaggedImages}`);
       for (const item of summary.added) console.log(`    + ${item}`);

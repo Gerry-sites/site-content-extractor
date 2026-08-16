@@ -136,6 +136,62 @@ describe("wix extractor", () => {
     expect(page.images.every((img) => img.src.includes("/v1/fit/w_1800"))).toBe(true);
     expect(page.kind).toBe("gallery");
   });
+
+  it("copies Pro Gallery item titles and descriptions from warmup data", async () => {
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="generator" content="Wix.com Website Builder" />
+    <title>After the Flood</title>
+    <script type="application/json" id="wix-warmup-data">${JSON.stringify({
+      pages: {
+        appsWarmupData: {
+          tpa: {
+            "comp-gallery_galleryData": {
+              items: [
+                {
+                  mediaUrl: "bfe860_cc280acbdadf439b85e9d4d898cf244e~mv2.jpg",
+                  metaData: {
+                    title: "After The Flood",
+                    description: "Oil on canvas, 100 cm x 70 cm. A symbolic work.",
+                  },
+                },
+                {
+                  mediaUrl: "bfe860_sketch~mv2.jpg",
+                  metaData: { title: "After The Flood sketch" },
+                },
+              ],
+            },
+          },
+        },
+      },
+    })}</script>
+  </head>
+  <body>
+    <div id="SITE_PAGES">
+      <div data-testid="pro-gallery">
+        <img src="https://static.wixstatic.com/media/bfe860_cc280acbdadf439b85e9d4d898cf244e~mv2.jpg/v1/fill/w_323,h_322,q_90/a.jpg" alt="" />
+        <img src="https://static.wixstatic.com/media/bfe860_sketch~mv2.jpg/v1/fill/w_322,h_322,q_90/b.jpg" alt="" />
+        <img src="https://static.wixstatic.com/media/bfe860_other~mv2.jpg/v1/fill/w_322,h_322,q_90/c.jpg" alt="" />
+        <img src="https://static.wixstatic.com/media/bfe860_last~mv2.jpg/v1/fill/w_322,h_322,q_90/d.jpg" alt="" />
+      </div>
+    </div>
+  </body>
+</html>`;
+    const page = await wixExtractor.extractPage({
+      url: "https://studio.example.com/after-the-flood",
+      html,
+      seedUrl: "https://studio.example.com/",
+    });
+    const painting = page.images.find((img) =>
+      img.src.includes("bfe860_cc280acbdadf439b85e9d4d898cf244e~mv2.jpg"),
+    );
+    const sketch = page.images.find((img) => img.src.includes("bfe860_sketch~mv2.jpg"));
+    expect(painting?.title).toBe("After The Flood");
+    expect(painting?.caption).toContain("Oil on canvas, 100 cm x 70 cm");
+    expect(sketch?.title).toBe("After The Flood sketch");
+    expect(sketch?.caption).toBeUndefined();
+  });
 });
 
 describe("wordpress extractor", () => {
@@ -157,5 +213,32 @@ describe("wordpress extractor", () => {
     expect(page.htmlContent).toContain("bilingual recipe");
     expect(page.images.some((img) => img.src.includes("dish.jpg"))).toBe(true);
     expect(page.images.some((img) => /[?&]w=300/.test(img.src))).toBe(false);
+  });
+
+  it("copies WordPress figcaptions onto the image so they survive gallery cleanup", async () => {
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="generator" content="WordPress.com" />
+    <title>Still life</title>
+  </head>
+  <body>
+    <article class="post">
+      <div class="entry-content">
+        <p>A photographed dish from the studio lunch.</p>
+        <figure class="wp-caption">
+          <img src="https://blog.example.com/wp-content/uploads/toast.jpg" alt="" />
+          <figcaption class="wp-caption-text">Olive oil on toast, 2016</figcaption>
+        </figure>
+      </div>
+    </article>
+  </body>
+</html>`;
+    const page = await wordpressExtractor.extractPage({
+      url: "https://blog.example.com/still-life/",
+      html,
+      seedUrl: "https://blog.example.com/",
+    });
+    expect(page.images[0]?.caption).toBe("Olive oil on toast, 2016");
   });
 });

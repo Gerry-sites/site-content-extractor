@@ -6,6 +6,7 @@ import { exists, ensureDir, readJson, resetDir, writeJson, writeText } from "../
 import type { ImageReviewEntry } from "../review/images.js";
 import { packFileFromSitePath, type PackFolder } from "./paths.js";
 import { wordpressOriginalUrl } from "../media/urls.js";
+import { asGalleryEntries, galleryItemSrc } from "./gallery.js";
 import {
   cleanMarkdownBody,
   firstProseParagraph,
@@ -48,10 +49,7 @@ const WIX_PLACEHOLDER =
 const WIX_COUNTER = /\d+\s*\/\s*\d+/;
 const IMAGE_REF = /(?:\(|src=["']|heroImage:\s*|-\s+)(\/?images\/[^\s)"']+)/g;
 
-export function isWordPressCollectionUrl(
-  sourceUrl: string | undefined,
-  slug: string,
-): boolean {
+export function isWordPressCollectionUrl(sourceUrl: string | undefined, slug: string): boolean {
   if (!sourceUrl) return false;
   try {
     const pathname = new URL(sourceUrl).pathname.replace(/\/+$/, "") || "/";
@@ -112,8 +110,8 @@ export function extractImageRefs(markdown: string, frontmatter: Record<string, u
   const refs = new Set<string>();
   if (typeof frontmatter.heroImage === "string") refs.add(stripMediaQuery(frontmatter.heroImage));
   if (Array.isArray(frontmatter.gallery)) {
-    for (const item of frontmatter.gallery) {
-      if (typeof item === "string") refs.add(stripMediaQuery(item));
+    for (const item of asGalleryEntries(frontmatter.gallery)) {
+      refs.add(stripMediaQuery(galleryItemSrc(item)));
     }
   }
   const re = new RegExp(IMAGE_REF.source, "g");
@@ -241,13 +239,19 @@ function toFrontmatter(
   const heroImage =
     typeof parsed.heroImage === "string" ? stripMediaQuery(parsed.heroImage) : undefined;
   const parsedGallery = Array.isArray(parsed.gallery)
-    ? parsed.gallery.filter((item): item is string => typeof item === "string").map(stripMediaQuery)
+    ? asGalleryEntries(parsed.gallery).map((item) =>
+        typeof item === "string"
+          ? stripMediaQuery(item)
+          : { ...item, src: stripMediaQuery(item.src) },
+      )
     : undefined;
   const gallery = galleryWithoutHero(heroImage, [
     parsedGallery,
     folder === "portfolio" ? localImagePaths(body) : undefined,
   ]);
-  const locals = [heroImage, ...gallery].filter((item): item is string => Boolean(item));
+  const locals = [heroImage, ...gallery.map(galleryItemSrc)].filter((item): item is string =>
+    Boolean(item),
+  );
   const nextBody = folder === "portfolio" ? stripLocalImageEmbeds(body, locals) : body;
 
   const fm: Frontmatter = {
@@ -258,6 +262,8 @@ function toFrontmatter(
     heroImage,
     gallery: gallery.length ? gallery : undefined,
   };
+  if (typeof parsed.heroTitle === "string") fm.heroTitle = parsed.heroTitle;
+  if (typeof parsed.heroCaption === "string") fm.heroCaption = parsed.heroCaption;
   if (folder !== "pages") {
     let date = typeof parsed.date === "string" ? parsed.date : "1970-01-01";
     if (date === "1970-01-01") {
@@ -357,19 +363,14 @@ export async function prunePack(packDir: string, outputDir: string): Promise<Pru
       rewriteMedia(item.body),
       stripTitleSuffix(String(item.frontmatter.title ?? item.slug)),
     );
-    const { fm, body } = toFrontmatter(
-      item.frontmatter,
-      decision.folder,
-      item.slug,
-      cleanedBody,
-    );
+    const { fm, body } = toFrontmatter(item.frontmatter, decision.folder, item.slug, cleanedBody);
     if (typeof fm.heroImage === "string" && flaggedSkip.has(fm.heroImage)) {
       delete fm.heroImage;
       imagesSkippedFlagged += 1;
     }
     if (Array.isArray(fm.gallery)) {
-      const next = fm.gallery.filter((src) => {
-        if (!flaggedSkip.has(src)) return true;
+      const next = fm.gallery.filter((item) => {
+        if (!flaggedSkip.has(galleryItemSrc(item))) return true;
         imagesSkippedFlagged += 1;
         return false;
       });

@@ -13,6 +13,7 @@ import {
   yearFromHeadings,
   localImagePaths,
 } from "./cleanup.js";
+import { galleryItemSrc, type GalleryEntry } from "../pack/gallery.js";
 
 export type MarkdownResult = {
   filename: string;
@@ -61,6 +62,35 @@ function uniqueLocals(paths: Array<string | undefined>): string[] {
   return out;
 }
 
+function imageMetaForLocal(
+  local: string,
+  page: ExtractedPage,
+  imagePaths: ImagePathMap,
+): { title?: string; caption?: string } | undefined {
+  const img = page.images.find((image) => {
+    const mapped = imagePaths.get(image.src) || imagePaths.get(upgradeMediaUrl(image.src));
+    return mapped === local;
+  });
+  if (!img || (!img.title && !img.caption)) return undefined;
+  return { title: img.title, caption: img.caption };
+}
+
+function galleryEntriesForLocals(
+  locals: string[],
+  page: ExtractedPage,
+  imagePaths: ImagePathMap,
+): GalleryEntry[] {
+  return locals.map((local) => {
+    const meta = imageMetaForLocal(local, page, imagePaths);
+    if (!meta) return local;
+    return {
+      src: local,
+      ...(meta.title ? { title: meta.title } : {}),
+      ...(meta.caption ? { caption: meta.caption } : {}),
+    };
+  });
+}
+
 export function generateMarkdown(
   page: ExtractedPage,
   imagePaths: ImagePathMap,
@@ -90,7 +120,12 @@ export function generateMarkdown(
     (page.heroImage &&
       (imagePaths.get(page.heroImage) || imagePaths.get(upgradeMediaUrl(page.heroImage)))) ||
     allLocals[0];
-  const galleryForMatter = allLocals.filter((src) => src !== heroLocal);
+  const heroMeta = heroLocal ? imageMetaForLocal(heroLocal, page, imagePaths) : undefined;
+  const galleryForMatter = galleryEntriesForLocals(
+    allLocals.filter((src) => src !== heroLocal),
+    page,
+    imagePaths,
+  );
 
   if (allLocals.length >= 1) {
     body = stripLocalImageEmbeds(body, allLocals);
@@ -116,15 +151,13 @@ export function generateMarkdown(
   const title = polishTitle(page.title || "Untitled");
   const frontmatter: Frontmatter = {
     title,
-    description: polishDescription(
-      page.description,
-      body,
-      title,
-    ),
+    description: polishDescription(page.description, body, title),
     slug: page.slug,
     sourceUrl: page.url,
     heroImage: heroLocal || undefined,
   };
+  if (heroMeta?.title) frontmatter.heroTitle = heroMeta.title;
+  if (heroMeta?.caption) frontmatter.heroCaption = heroMeta.caption;
 
   if (folder !== "pages") {
     frontmatter.date = fallbackDate(page, body);
@@ -139,7 +172,7 @@ export function generateMarkdown(
 
   if (galleryForMatter.length >= 1) {
     frontmatter.gallery = galleryForMatter;
-    if (!frontmatter.heroImage) frontmatter.heroImage = galleryForMatter[0];
+    if (!frontmatter.heroImage) frontmatter.heroImage = galleryItemSrc(galleryForMatter[0]);
   }
 
   const content = serializeMarkdownFile(frontmatter, body);

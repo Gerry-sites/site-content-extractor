@@ -40,7 +40,8 @@ describe("markdown cleanup helpers", () => {
     ).toBe(true);
     expect(looksLikeGluedDescription("Jeff StudioDRAWINGTURVY AUTOPSY 2016")).toBe(true);
     expect(looksLikeGluedDescription("Who we are")).toBe(false);
-    const body = "## 2018\n\nThis project began with the observation over several years of tribalism.\n";
+    const body =
+      "## 2018\n\nThis project began with the observation over several years of tribalism.\n";
     expect(
       polishDescription(
         "DRAWINGCAVE 2018 This project began with the observation over the past several years.",
@@ -71,6 +72,29 @@ describe("markdown cleanup helpers", () => {
         ["/images/portfolio/cave-1.jpg", "/images/portfolio/cave-2.jpg"],
       ]),
     ).toEqual(["/images/portfolio/cave-1.jpg", "/images/portfolio/cave-2.jpg"]);
+  });
+
+  it("keeps work titles and captions when dropping the hero", () => {
+    expect(
+      galleryWithoutHero("/images/portfolio/flood-hero.jpg", [
+        [
+          {
+            src: "/images/portfolio/flood-hero.jpg",
+            title: "After The Flood",
+            caption: "Oil on canvas.",
+          },
+          {
+            src: "/images/portfolio/flood-1.jpg",
+            title: "After The Flood sketch",
+          },
+        ],
+      ]),
+    ).toEqual([
+      {
+        src: "/images/portfolio/flood-1.jpg",
+        title: "After The Flood sketch",
+      },
+    ]);
   });
 
   it("ignores social and mailto hrefs", () => {

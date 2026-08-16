@@ -9,8 +9,15 @@ import type { ImportOptions } from "../types/config.js";
 import { packFileFromSitePath } from "../pack/paths.js";
 import { extractImageRefs } from "../pack/prune.js";
 import {
-  cleanMarkdownBody,
+  asGalleryEntries,
+  captionsNeedMerge,
+  galleryItemSrc,
+  gallerySrcs,
   galleryWithoutHero,
+  mergeGalleryCaptions,
+} from "../pack/gallery.js";
+import {
+  cleanMarkdownBody,
   polishDescription,
   polishTitle,
   stripYearHeadings,
@@ -22,6 +29,7 @@ export type ImportSummary = {
   skippedProtected: string[];
   skippedExisting: string[];
   filledImages: string[];
+  filledCaptions: string[];
   skippedFlaggedImages: number;
   copiedImages: number;
 };
@@ -42,6 +50,8 @@ function astroKeys(
     next.date = String(frontmatter.date ?? "1970-01-01");
   }
   if (typeof frontmatter.heroImage === "string") next.heroImage = frontmatter.heroImage;
+  if (typeof frontmatter.heroTitle === "string") next.heroTitle = frontmatter.heroTitle;
+  if (typeof frontmatter.heroCaption === "string") next.heroCaption = frontmatter.heroCaption;
   if (Array.isArray(frontmatter.gallery)) next.gallery = frontmatter.gallery;
   if (Array.isArray(frontmatter.categories)) next.categories = frontmatter.categories;
   if (Array.isArray(frontmatter.tags)) next.tags = frontmatter.tags;
@@ -77,8 +87,8 @@ async function referencedImageMissing(
   frontmatter: Record<string, unknown>,
 ): Promise<boolean> {
   const refs = [
-    frontmatter.heroImage,
-    ...((frontmatter.gallery as string[] | undefined) ?? []),
+    typeof frontmatter.heroImage === "string" ? frontmatter.heroImage : undefined,
+    ...gallerySrcs(frontmatter.gallery),
   ].filter((item): item is string => typeof item === "string" && item.startsWith("/"));
   if (!refs.length) return true;
   for (const ref of refs) {
@@ -102,6 +112,7 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
     skippedProtected: [],
     skippedExisting: [],
     filledImages: [],
+    filledCaptions: [],
     skippedFlaggedImages: 0,
     copiedImages: 0,
   };
@@ -146,14 +157,10 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
         const packBodyRefs = extractImageRefs(parsed.body, parsed.frontmatter).map((ref) =>
           ref.startsWith("/") ? ref : `/${ref}`,
         );
-        fm.gallery = galleryWithoutHero(packHero, [
-          Array.isArray(fm.gallery) ? (fm.gallery as string[]) : undefined,
-          packBodyRefs,
-        ]);
+        fm.gallery = galleryWithoutHero(packHero, [asGalleryEntries(fm.gallery), packBodyRefs]);
 
         if (protectedSet.has(slug.toLowerCase())) {
-          const allow =
-            collection === "pages" ? options.overwritePages : options.overwriteEntries;
+          const allow = collection === "pages" ? options.overwritePages : options.overwriteEntries;
           if (!allow) {
             summary.skippedProtected.push(`${collection}/${slug}`);
             continue;
@@ -163,38 +170,67 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
         const destExists = await exists(destFile);
         if (destExists && collection !== "pages" && !options.overwriteEntries) {
           const missing = await referencedImageMissing(targetRoot, parsed.frontmatter);
-          if (!missing) {
+          const existingRaw = await readFile(destFile, "utf8");
+          const existing = parseFrontmatter(existingRaw);
+          const captionMerge =
+            captionsNeedMerge(
+              asGalleryEntries(existing.frontmatter.gallery),
+              asGalleryEntries(fm.gallery),
+            ) ||
+            (typeof fm.heroCaption === "string" &&
+              typeof existing.frontmatter.heroCaption !== "string") ||
+            (typeof fm.heroTitle === "string" &&
+              typeof existing.frontmatter.heroTitle !== "string");
+          if (!missing && !captionMerge) {
             summary.skippedExisting.push(`${collection}/${slug}`);
             continue;
           }
-          await copyEntryImages(
-            packRoot,
-            targetRoot,
-            parsed.frontmatter,
-            parsed.body,
-            skippedSitePaths,
-            summary,
-          );
-          const existingRaw = await readFile(destFile, "utf8");
-          const existing = parseFrontmatter(existingRaw);
+          if (missing) {
+            await copyEntryImages(
+              packRoot,
+              targetRoot,
+              parsed.frontmatter,
+              parsed.body,
+              skippedSitePaths,
+              summary,
+            );
+          }
           const existingHero =
-            (typeof existing.frontmatter.heroImage === "string" && existing.frontmatter.heroImage) ||
+            (typeof existing.frontmatter.heroImage === "string" &&
+              existing.frontmatter.heroImage) ||
             packHero;
+          const mergedGallery = mergeGalleryCaptions(
+            galleryWithoutHero(existingHero, [
+              asGalleryEntries(existing.frontmatter.gallery),
+              asGalleryEntries(fm.gallery),
+            ]),
+            asGalleryEntries(fm.gallery),
+          );
           const merged: Record<string, unknown> = {
             ...existing.frontmatter,
-            heroImage: packHero ?? existing.frontmatter.heroImage,
-            gallery: galleryWithoutHero(existingHero, [
-              Array.isArray(existing.frontmatter.gallery)
-                ? (existing.frontmatter.gallery as string[])
-                : undefined,
-              Array.isArray(fm.gallery) ? (fm.gallery as string[]) : undefined,
-            ]),
+            heroImage: missing
+              ? (packHero ?? existing.frontmatter.heroImage)
+              : (existing.frontmatter.heroImage ?? packHero),
+            gallery: mergedGallery,
           };
+          if (
+            typeof existing.frontmatter.heroTitle !== "string" &&
+            typeof fm.heroTitle === "string"
+          ) {
+            merged.heroTitle = fm.heroTitle;
+          }
+          if (
+            typeof existing.frontmatter.heroCaption !== "string" &&
+            typeof fm.heroCaption === "string"
+          ) {
+            merged.heroCaption = fm.heroCaption;
+          }
           delete merged.slug;
           delete merged.sourceUrl;
           await mkdir(destDir, { recursive: true });
           await writeFile(destFile, serializeImported(merged, existing.body), "utf8");
-          summary.filledImages.push(`${collection}/${slug}`);
+          if (missing) summary.filledImages.push(`${collection}/${slug}`);
+          if (captionMerge) summary.filledCaptions.push(`${collection}/${slug}`);
           continue;
         }
 
@@ -216,8 +252,8 @@ export async function importPacks(options: ImportOptions): Promise<ImportSummary
           delete fm.heroImage;
         }
         if (Array.isArray(fm.gallery)) {
-          fm.gallery = fm.gallery.filter(
-            (item) => typeof item === "string" && !skippedSitePaths.has(item),
+          fm.gallery = asGalleryEntries(fm.gallery).filter(
+            (item) => !skippedSitePaths.has(galleryItemSrc(item)),
           );
         }
 

@@ -231,6 +231,19 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
       writtenByUrl.set(page.url, md.relativePath);
       keep.add(md.relativePath.replace(/\\/g, "/"));
       markdownContents.push(md.content);
+      const extractedCaptions = page.images.filter((img) => img.title || img.caption);
+      if (extractedCaptions.length) {
+        const hay = md.content.replace(/\s+/g, " ");
+        const dropped = extractedCaptions.filter((img) => {
+          const needle = (img.caption || img.title || "").replace(/\s+/g, " ").slice(0, 40);
+          return needle.length >= 8 && !hay.includes(needle);
+        });
+        if (dropped.length) {
+          warnings.push(
+            `Work titles/captions extracted from ${page.url} but missing from ${md.relativePath}`,
+          );
+        }
+      }
       logger.debug(`Wrote ${md.relativePath}`);
     }
     const removed = await removeOrphanMarkdown(outputDir, keep);
@@ -268,7 +281,18 @@ const pages = defineCollection({
     description: z.string().optional(),
     slug: z.string(),
     heroImage: z.string().optional(),
-    gallery: z.array(z.string()).optional(),
+    gallery: z
+      .array(
+        z.union([
+          z.string(),
+          z.object({
+            src: z.string(),
+            title: z.string().optional(),
+            caption: z.string().optional(),
+          }),
+        ]),
+      )
+      .optional(),
   }),
 });
 
@@ -365,8 +389,7 @@ export const collections = { pages, blog };
     );
   }
   const skipOnImport = review.filter(
-    (entry) =>
-      entry.flags.includes("chrome") || entry.flags.includes("other-host"),
+    (entry) => entry.flags.includes("chrome") || entry.flags.includes("other-host"),
   );
   recommendations.push(
     "Import with `site-migrate import <pack>/pruned --target <astro-clone>` after reviewing image-review.json.",

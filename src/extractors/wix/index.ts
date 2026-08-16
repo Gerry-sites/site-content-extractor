@@ -20,6 +20,7 @@ import { extractNavigation, extractSiteMetadata } from "../shared/metadata.js";
 import { pathFromUrl } from "../../utils/url.js";
 import { toSlug } from "../../utils/slug.js";
 import type { ExtractedPage } from "../../types/schemas.js";
+import { applyWixGalleryMetadata } from "./gallery-data.js";
 
 function isInfoRoute(url: string): boolean {
   try {
@@ -131,10 +132,11 @@ export const wixExtractor: PlatformExtractor = {
 
     const images = extractImages($main, ctx.url);
     const pageImages = extractImages($, ctx.url);
-    const mergedImages = [...images];
+    let mergedImages = [...images];
     for (const img of [...pageImages, ...preChromeImages]) {
       if (!mergedImages.some((m) => m.src === img.src)) mergedImages.push(img);
     }
+    mergedImages = applyWixGalleryMetadata(mergedImages, ctx.html);
 
     const links = extractLinks($main, ctx.url, ctx.seedUrl);
     const videos = extractVideos($main, ctx.url);

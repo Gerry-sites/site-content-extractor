@@ -4,6 +4,7 @@ import { exists } from "../utils/fs.js";
 import { parseFrontmatter } from "../markdown/frontmatter.js";
 import { FrontmatterSchema } from "../types/schemas.js";
 import { isSkippableAsset } from "../media/urls.js";
+import { gallerySrcs } from "../pack/gallery.js";
 
 export type ValidationIssue = {
   file: string;
@@ -88,7 +89,7 @@ export async function validateOutput(outputDir: string): Promise<ValidationResul
     // Validate image references exist on disk
     const imageRefs = [
       ...(fm.heroImage ? [fm.heroImage] : []),
-      ...(fm.gallery ?? []),
+      ...gallerySrcs(fm.gallery),
       ...extractMarkdownImages(raw),
     ];
 

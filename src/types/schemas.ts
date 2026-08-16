@@ -68,6 +68,8 @@ export const PagesManifestSchema = z.object({
 export const ExtractedImageSchema = z.object({
   src: z.string(),
   alt: z.string().optional(),
+  title: z.string().optional(),
+  caption: z.string().optional(),
   width: z.number().optional(),
   height: z.number().optional(),
   role: z.enum(["content", "hero", "gallery", "logo", "favicon", "og"]).default("content"),
@@ -131,11 +133,24 @@ export const FrontmatterSchema = z.object({
   description: z.string().optional(),
   slug: z.string().min(1),
   heroImage: z.string().optional(),
+  heroTitle: z.string().optional(),
+  heroCaption: z.string().optional(),
   date: z.string().optional(),
   author: z.string().optional(),
   categories: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
-  gallery: z.array(z.string()).optional(),
+  gallery: z
+    .array(
+      z.union([
+        z.string(),
+        z.object({
+          src: z.string(),
+          title: z.string().optional(),
+          caption: z.string().optional(),
+        }),
+      ]),
+    )
+    .optional(),
   draft: z.boolean().optional(),
   sourceUrl: z.string().optional(),
 });

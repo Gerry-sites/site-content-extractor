@@ -31,11 +31,26 @@ export function extractImages($: CheerioAPI, pageUrl: string): ExtractedImage[] 
     if (!absolute || seen.has(absolute)) return;
     seen.add(absolute);
 
+    const figure = $(el).closest("figure, .wp-caption, .gallery-item, .blocks-gallery-item");
+    const nearbyCaption = figure
+      .find("figcaption, .wp-caption-text, .gallery-caption")
+      .first()
+      .text()
+      .replace(/\s+/g, " ")
+      .trim();
+    const titleAttr = $(el).attr("title")?.trim();
+    const caption =
+      nearbyCaption ||
+      (titleAttr && titleAttr.length > 8 && !/\.(jpe?g|png|gif|webp|avif)$/i.test(titleAttr)
+        ? titleAttr
+        : undefined);
+
     const width = Number($(el).attr("width")) || undefined;
     const height = Number($(el).attr("height")) || undefined;
     images.push({
       src: absolute,
       alt: $(el).attr("alt")?.trim() || undefined,
+      caption: caption || undefined,
       width: Number.isFinite(width) ? width : undefined,
       height: Number.isFinite(height) ? height : undefined,
       role: "content",
