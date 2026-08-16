@@ -64,4 +64,23 @@ describe("pack validation", () => {
       true,
     );
   });
+
+  it("does not walk a nested pruned directory", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "site-migrate-validate-pruned-"));
+    await mkdir(path.join(dir, "blog"), { recursive: true });
+    await mkdir(path.join(dir, "pruned", "blog"), { recursive: true });
+    await writeFile(
+      path.join(dir, "blog/stew.md"),
+      "---\ntitle: Stew\ndescription: Food\nslug: stew\ndate: 2016-01-01\n---\n\nBody.\n",
+      "utf8",
+    );
+    await writeFile(
+      path.join(dir, "pruned/blog/hub.md"),
+      "---\ntitle: Hub\ndescription: Index\nslug: hub\ndate: 1970-01-01\n---\n\nLinks.\n",
+      "utf8",
+    );
+    const result = await validateOutput(dir);
+    expect(result.ok).toBe(true);
+    expect(result.issues.some((issue) => issue.file.includes("pruned/"))).toBe(false);
+  });
 });

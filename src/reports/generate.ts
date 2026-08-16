@@ -31,6 +31,7 @@ export function buildReportMarkdown(report: MigrationReport): string {
     `| Metric | Count |`,
     `| --- | ---: |`,
     `| Discovered | ${report.coverage?.discovered ?? report.pages} |`,
+    `| Expected HTML | ${report.coverage?.htmlExpected ?? report.coverage?.withHtml ?? report.pages} |`,
     `| With HTML | ${report.coverage?.withHtml ?? report.pages} |`,
     `| Missing HTML | ${report.coverage?.missingHtml.length ?? 0} |`,
     `| Missing Markdown | ${report.coverage?.missingMarkdown.length ?? 0} |`,
@@ -39,7 +40,7 @@ export function buildReportMarkdown(report: MigrationReport): string {
     "",
     "## Review",
     "",
-    "See `image-review.json` for per-image flags (chrome, other-host, title-name-in-media, inline-blog).",
+    "See `image-review.json` for per-image flags (chrome, other-host, title-name-in-media, inline-blog). Import skips chrome and other-host unless `--include-flagged`.",
     "",
   ];
 

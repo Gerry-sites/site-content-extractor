@@ -62,7 +62,7 @@ export const ImportOptionsSchema = z.object({
   overwritePages: z.boolean().default(false),
   overwriteEntries: z.boolean().default(false),
   includeFlagged: z.boolean().default(false),
-  flagInlineBlog: z.boolean().default(true),
+  flagInlineBlog: z.boolean().default(false),
 });
 
 export type ImportOptions = z.infer<typeof ImportOptionsSchema>;

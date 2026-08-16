@@ -48,6 +48,23 @@ const WIX_PLACEHOLDER =
 const WIX_COUNTER = /\d+\s*\/\s*\d+/;
 const IMAGE_REF = /(?:\(|src=["']|heroImage:\s*|-\s+)(\/?images\/[^\s)"']+)/g;
 
+export function isWordPressCollectionUrl(
+  sourceUrl: string | undefined,
+  slug: string,
+): boolean {
+  if (!sourceUrl) return false;
+  try {
+    const pathname = new URL(sourceUrl).pathname.replace(/\/+$/, "") || "/";
+    const parts = pathname.split("/").filter(Boolean);
+    if (parts.length !== 2) return false;
+    const leaf = decodeURIComponent(parts[1] ?? "").toLowerCase();
+    if (leaf !== slug.toLowerCase()) return false;
+    return /^(recipes?|przepisy|categories|category|collections?|topics?)$/i.test(parts[0] ?? "");
+  } catch {
+    return false;
+  }
+}
+
 export function platformFamily(platform: string | undefined): PlatformFamily {
   const lower = (platform ?? "").toLowerCase();
   if (lower.includes("wix")) return "wix";
@@ -125,8 +142,9 @@ export function decideEntry(
 ): PruneDecision {
   const from = `${input.folder}/${input.slug}.md`;
   const bodyAndDesc = `${input.description}\n${input.body}`;
-  const links = markdownLinkCount(input.body);
-  const prose = proseLength(input.body);
+  const cleaned = cleanMarkdownBody(input.body, input.title);
+  const links = markdownLinkCount(cleaned);
+  const prose = proseLength(cleaned);
   const images = localImageCount(input.body, input.frontmatter);
   const hero =
     typeof input.frontmatter.heroImage === "string"
@@ -137,7 +155,9 @@ export function decideEntry(
     const heroPath = hero.startsWith("/") ? hero : hero ? `/${hero}` : "";
     return normalized !== heroPath;
   }).length;
-  const cleaned = cleanMarkdownBody(input.body, input.title);
+  const sourceUrl =
+    typeof input.frontmatter.sourceUrl === "string" ? input.frontmatter.sourceUrl : undefined;
+  const paragraph = firstProseParagraph(cleaned);
 
   if (PROTECTED.has(input.slug.toLowerCase())) {
     return { slug: input.slug, from, keep: false, reason: "protected-page" };
@@ -171,15 +191,26 @@ export function decideEntry(
 
   const wixHub = family === "wix" && links >= 4 && prose < 100;
   const wpHub = family === "wordpress" && ((links >= 8 && prose < 300) || links >= 40);
+  const wpCollection =
+    family === "wordpress" &&
+    isWordPressCollectionUrl(sourceUrl, input.slug) &&
+    links >= 2 &&
+    (!paragraph || paragraph.length < 80);
+  const wpListing =
+    family === "wordpress" &&
+    links >= 3 &&
+    images >= 2 &&
+    prose < 180 &&
+    (!paragraph || paragraph.length < 80);
   const genericHub = family === "generic" && links >= 4 && prose < 100;
-  if (wixHub || wpHub || genericHub) {
+  if (wixHub || wpHub || wpCollection || wpListing || genericHub) {
     return { slug: input.slug, from, keep: false, reason: "hub-index" };
   }
 
   if (images === 0 && prose < 80) {
     return { slug: input.slug, from, keep: false, reason: "empty" };
   }
-  if (nonHeroImages === 0 && !firstProseParagraph(cleaned) && proseLength(cleaned) < 80) {
+  if (nonHeroImages === 0 && !paragraph && proseLength(cleaned) < 80) {
     return { slug: input.slug, from, keep: false, reason: "thin-chrome" };
   }
 

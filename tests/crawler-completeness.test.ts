@@ -161,6 +161,7 @@ describe("crawler completeness fixture", () => {
       expect(result.report.coverage?.missingHtml.some((u) => u.endsWith("/about"))).toBe(false);
       expect(result.report.coverage?.missingHtml.some((u) => u.endsWith("/works"))).toBe(false);
       expect(await exists(path.join(output, "pruned", "prune-report.json"))).toBe(true);
+      expect(result.validationOk).toBe(true);
     } finally {
       await close();
     }

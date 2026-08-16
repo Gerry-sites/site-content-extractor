@@ -32,8 +32,13 @@ export function rememberResumePages(
   }
 }
 
-export function shouldRecrawl(url: string, htmlByUrl: Map<string, string>): boolean {
+export function shouldRecrawl(
+  url: string,
+  htmlByUrl: Map<string, string>,
+  status?: number,
+): boolean {
   if (htmlByUrl.has(url)) return false;
+  if (status && status >= 400) return false;
   if (isLowValueCrawlUrl(url) || isAssetUrl(url)) return false;
   return true;
 }
@@ -44,7 +49,7 @@ export function recrawlQueue(
 ): ResumeQueueItem[] {
   const queue: ResumeQueueItem[] = [];
   for (const page of discovered.values()) {
-    if (!shouldRecrawl(page.normalizedUrl, htmlByUrl)) continue;
+    if (!shouldRecrawl(page.normalizedUrl, htmlByUrl, page.status)) continue;
     queue.push({
       url: page.normalizedUrl,
       depth: page.depth,

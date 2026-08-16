@@ -45,11 +45,13 @@ Only use this for sites you own or are authorized to migrate.
 
 The crawl finished but Markdown validation or **coverage** found errors (missing HTML, missing images, leftover remote thumbs, missing title/slug). Open `report.md` → Coverage and fix, or re-run with `--resume` to fill holes.
 
+Discovered URLs that 404 (deleted posts, a missing `/contact` extra seed, `osd.xml`) stay listed in `pages.json` on resume. Extra-seed 404s are warnings. A pruned pack can still be import-ready when the raw pack exits 2 for those dead URLs.
+
 ## Wix pages look incomplete
 
 Wix hydrates late. The crawler waits for `networkidle`, then `--settle-ms` (default 2500), clicks Load more, scrolls, and waits until image counts stabilize. Increase `--settle-ms` or `--timeout` for stubborn Pro Galleries. Image fetches send a `Referer` of the seed origin.
 
-`--resume` only recrawls pages that still have no HTML in `html-index.json`. Cached URLs stay in `pages.json`. If every discovered URL already has HTML, the browser is not launched. Video URLs and tokenized Wix storefront assets are not coverage holes.
+`--resume` only recrawls pages that still have no HTML in `html-index.json`. Cached URLs stay in `pages.json`. Known HTTP 404s and `osd.xml` are not recrawled. If every remaining content URL already has HTML, the browser is not launched. Video URLs and tokenized Wix storefront assets are not coverage holes.
 
 ## Sharp install issues on Windows
 
@@ -72,6 +74,12 @@ Import `<pack>/pruned`, not the raw crawl. The raw pack still contains `copy-of-
 ## Body images 404 in the clone
 
 Current import copies every `/images/` path in the Markdown body as well as `heroImage` / `gallery`. If a WordPress pack still has `?w=` on local paths, re-migrate (or re-prune) so queries are stripped before import. Leftover remote thumbs are a coverage hole in `report.md`, not an import skip.
+
+WordPress inlines are flagged `inline-blog` for review. Default import copies them. If body photos 404, the pack path is missing or you passed `--flag-inline-blog`. Chrome and other-host still skip unless `--include-flagged`.
+
+## Importing `pruned-data/` looks wrong
+
+Migrate writes keepers to `<pack>/pruned`. `pruned-data/` is only the default parent for a standalone `site-migrate prune` if you do not pass `--output`. Older copies there can still have first-wins `home-N.jpg` paths or hubs. Import `<pack>/pruned`.
 
 ## Portfolio hubs landed as works
 

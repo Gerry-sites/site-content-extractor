@@ -141,7 +141,12 @@ async function collectMarkdownFiles(dir: string): Promise<string[]> {
     for (const entry of entries) {
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === "images" || entry.name === "node_modules" || entry.name === "html") {
+        if (
+          entry.name === "images" ||
+          entry.name === "node_modules" ||
+          entry.name === "html" ||
+          entry.name === "pruned"
+        ) {
           continue;
         }
         await walk(full);

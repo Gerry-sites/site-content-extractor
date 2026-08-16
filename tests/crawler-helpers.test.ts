@@ -111,6 +111,32 @@ describe("resume discovery", () => {
     expect(recrawlQueue(discovered, htmlByUrl)).toEqual([]);
   });
 
+  it("does not recrawl URLs that already returned HTTP 404", () => {
+    const discovered = new Map();
+    rememberResumePages(
+      discovered,
+      [
+        {
+          url: "https://studio.example.com/works",
+          normalizedUrl: "https://studio.example.com/works",
+          depth: 1,
+          source: "link",
+        },
+        {
+          url: "https://studio.example.com/contact",
+          normalizedUrl: "https://studio.example.com/contact",
+          depth: 1,
+          source: "seed",
+          status: 404,
+        },
+      ],
+      ["https://studio.example.com/works"],
+    );
+    const htmlByUrl = new Map([["https://studio.example.com/works", "<p>works</p>"]]);
+    expect(shouldRecrawl("https://studio.example.com/contact", htmlByUrl, 404)).toBe(false);
+    expect(recrawlQueue(discovered, htmlByUrl)).toEqual([]);
+  });
+
   it("queues only URLs that still have no cached HTML", () => {
     const discovered = new Map();
     rememberResumePages(

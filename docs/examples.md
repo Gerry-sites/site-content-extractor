@@ -63,7 +63,9 @@ Produces `content.json` with the full extracted page objects.
 site-migrate import ./migrations/example/pruned --target /path/to/astro-clone --locale en
 ```
 
-Import the pruned folder, not the raw pack. Protected slugs (`home`, `about`, `contact`) are skipped in every collection unless `--overwrite-pages` / `--overwrite-entries`. Flagged images stay out of `public/images/` unless `--include-flagged`. Body `/images/` refs are copied with the hero and gallery.
+Import the pruned folder, not the raw pack. Protected slugs (`home`, `about`, `contact`) are skipped in every collection unless `--overwrite-pages` / `--overwrite-entries`. Chrome and other-host stay out of `public/images/` unless `--include-flagged`. Body `/images/` refs are copied with the hero and gallery.
+
+`inline-blog` and `title-name-in-media` are review labels and copy by default. Pass `--flag-inline-blog` only when those inlines should stay out of `public/images/`.
 
 ## Operator live checks
 
@@ -76,4 +78,4 @@ site-migrate https://www.byserafin.com/ --platform=wix --output ./packs/agatha -
 site-migrate https://cuisineandart.com/ --platform=wordpress --output ./packs/cuisine --overwrite
 ```
 
-Acceptance for a live pack: upgraded `w_1800` JPEGs (not `w_290` thumbs); about/contact text present; WordPress post count in the same ballpark as the live index; originals without `crop=1`; flagged inline illustrations in `image-review.json`. Dry-run import must leave About untouched.
+Acceptance for a live pack: upgraded `w_1800` JPEGs (not `w_290` thumbs); about/contact text present when those URLs exist (a 404 extra seed is a warning); WordPress post count in the same ballpark as the live index; originals without `crop=1` or `?w=`; flagged inline illustrations in `image-review.json`. Import `<pack>/pruned`, not `pruned-data/`. Dry-run import must leave About untouched. Prefer `--resume` over `--overwrite` when HTML is already cached.

@@ -200,4 +200,53 @@ describe("Astro import", () => {
       }),
     ).rejects.toThrow(/src\/content\/config\.ts/);
   });
+
+  it("copies inline-blog and title-name-in-media images by default", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "site-migrate-import-inline-"));
+    const pack = path.join(root, "pack");
+    const target = path.join(root, "site");
+    await write(path.join(target, "src/content/config.ts"), "export const collections = {}");
+    await write(
+      path.join(pack, "blog/albi.md"),
+      "---\ntitle: About Albi\ndescription: Museum visit\nslug: albi\ndate: 2015-12-30\nheroImage: /images/blog/albi-hero.jpg\n---\n\n![Albi](/images/blog/albi-2.jpg)\n",
+    );
+    await mkdir(path.join(pack, "images/blog"), { recursive: true });
+    await writeFile(path.join(pack, "images/blog/albi-hero.jpg"), PNG);
+    await writeFile(path.join(pack, "images/blog/albi-2.jpg"), PNG);
+    await write(
+      path.join(pack, "image-review.json"),
+      JSON.stringify([
+        {
+          remoteUrl: "https://blog.example.com/wp-content/uploads/albi-hero.jpg",
+          pageUrl: "https://blog.example.com/about-albi/",
+          sitePath: "/images/blog/albi-hero.jpg",
+          flags: [],
+        },
+        {
+          remoteUrl: "https://blog.example.com/wp-content/uploads/albi-2.jpg",
+          pageUrl: "https://blog.example.com/about-albi/",
+          sitePath: "/images/blog/albi-2.jpg",
+          flags: ["inline-blog", "title-name-in-media"],
+        },
+      ]),
+    );
+
+    const summary = await importPacks({
+      packs: [pack],
+      target,
+      locale: "en",
+      protectedPages: ["home", "about", "contact"],
+      overwritePages: false,
+      overwriteEntries: false,
+      includeFlagged: false,
+      flagInlineBlog: false,
+    });
+
+    expect(summary.added).toContain("blog/albi");
+    expect(await exists(path.join(target, "public/images/blog/albi-hero.jpg"))).toBe(true);
+    expect(await exists(path.join(target, "public/images/blog/albi-2.jpg"))).toBe(true);
+    expect(summary.skippedFlaggedImages).toBe(0);
+    const imported = await readFile(path.join(target, "src/content/blog/en/albi.md"), "utf8");
+    expect(imported).toContain("/images/blog/albi-2.jpg");
+  });
 });

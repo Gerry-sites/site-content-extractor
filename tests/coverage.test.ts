@@ -84,6 +84,9 @@ describe("coverage", () => {
     expect(coverage.missingHtml).toEqual([]);
     expect(coverageHasHoles(coverage)).toBe(false);
     expect(coverage.seedMissing).toEqual([{ path: "/contact", status: 404 }]);
+    expect(coverage.htmlExpected).toBe(1);
+    expect(coverage.withHtml).toBe(1);
+    expect(coverage.discovered).toBe(2);
   });
 
   it("does not count tokenized Wix storefront assets as missing images", () => {
@@ -169,6 +172,28 @@ describe("coverage", () => {
     });
     expect(coverage.discovered).toBe(1);
     expect(coverage.withHtml).toBe(1);
+    expect(coverage.htmlExpected).toBe(1);
+    expect(coverageHasHoles(coverage)).toBe(false);
+  });
+
+  it("does not expect HTML for low-value URLs such as osd.xml", () => {
+    const coverage = buildCoverage({
+      pages: [
+        page("https://studio.example.com/works"),
+        page("https://studio.example.com/osd.xml", 200),
+      ],
+      htmlByUrl: new Map([["https://studio.example.com/works", "<p>ok</p>"]]),
+      extracted: [],
+      writtenByUrl: new Map(),
+      imagePathMap: new Map(),
+      brokenImages: [],
+      markdownContents: ["# Works\n"],
+      seedMissing: [],
+    });
+    expect(coverage.discovered).toBe(2);
+    expect(coverage.htmlExpected).toBe(1);
+    expect(coverage.withHtml).toBe(1);
+    expect(coverage.missingHtml).toEqual([]);
     expect(coverageHasHoles(coverage)).toBe(false);
   });
 });

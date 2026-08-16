@@ -158,6 +158,7 @@ export const MigrationReportSchema = z.object({
     .object({
       discovered: z.number().int().nonnegative(),
       withHtml: z.number().int().nonnegative(),
+      htmlExpected: z.number().int().nonnegative().optional(),
       missingHtml: z.array(z.string()).default([]),
       missingMarkdown: z.array(z.string()).default([]),
       missingImages: z.array(z.string()).default([]),

@@ -107,7 +107,7 @@ program
   .option("--overwrite-pages", "Replace protected page Markdown", false)
   .option("--overwrite-entries", "Replace existing portfolio/blog Markdown", false)
   .option("--include-flagged", "Copy images that image-review flagged", false)
-  .option("--no-flag-inline-blog", "Do not skip inline blog images on import")
+  .option("--flag-inline-blog", "Skip images flagged inline-blog (review label only by default)")
   .action(async (packs: string[], opts: Record<string, unknown>) => {
     const parsed = ImportOptionsSchema.safeParse({
       packs,

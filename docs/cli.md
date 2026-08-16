@@ -40,7 +40,7 @@ site-migrate https://mysite.com --platform=wix
 site-migrate https://mysite.com --output ./migrated --resume
 ```
 
-`--resume` reuses `pages.json`, `html-index.json`, and already-downloaded images. It recrawls **only URLs that still have no cached HTML**, and it keeps every previously cached URL in `pages.json` (resume cannot shrink the pack). If every discovered URL already has HTML, Playwright is not launched. Markdown files not produced in this run are removed so a page cannot linger in both `pages/` and `portfolio/`. After a successful write, migrate also writes `pruned/` inside the pack unless you pass `--skip-prune`.
+`--resume` reuses `pages.json`, `html-index.json`, and already-downloaded images. It recrawls **only URLs that still have no cached HTML**, and it keeps every previously cached URL in `pages.json` (resume cannot shrink the pack). Known HTTP 404s and low-value URLs such as `osd.xml` are not recrawled. If every remaining content URL already has HTML, Playwright is not launched. Markdown files not produced in this run are removed so a page cannot linger in both `pages/` and `portfolio/`. After a successful write, migrate also writes `pruned/` inside the pack unless you pass `--skip-prune`.
 
 ### Skip images (content-only pass)
 
@@ -95,8 +95,10 @@ New titles drop a ` | Sitename` suffix and title-case ALL CAPS Wix document titl
 | `--protected-pages <list>` | `home,about,contact` | Slugs skipped in every collection         |
 | `--overwrite-pages`        | off                  | Allow replacing protected **pages**       |
 | `--overwrite-entries`      | off                  | Replace existing portfolio/blog bodies    |
-| `--include-flagged`        | off                  | Copy flagged images into `public/images/` |
-| `--no-flag-inline-blog`    | off                  | Treat `inline-blog` flags as unflagged    |
+| `--include-flagged`        | off                  | Copy chrome / other-host images too       |
+| `--flag-inline-blog`       | off                  | Also skip images flagged `inline-blog`    |
+
+`inline-blog` and `title-name-in-media` are review labels. Default import copies those files. Chrome and other-host stay out unless `--include-flagged`.
 
 ### Prune drafts and hub pages before import
 
@@ -107,13 +109,15 @@ site-migrate prune ./packs/client --output ./pruned-data
 site-migrate import ./packs/client/pruned --target /path/to/astro-clone --locale en
 ```
 
-Drops Wix `copy-of-*` / `hs-*` drafts, placeholder “Click here to add your own text” pages, `home` / `about` / `contact` in every collection, Wix gallery-counter descriptions (`1/1`, `PAINTING1/1`), homepage/section hubs, and WordPress category indexes.
+The standalone command writes `<output>/<pack-name>` (default `pruned-data/client`). Import `<pack>/pruned` from migrate, not leftover `pruned-data/` folders from an older run.
 
-A hub is dropped **even when it has a thumbnail gallery**: Wix/generic if there are 4+ in-content links and little prose; WordPress if there are 8+ links with little prose, or 40+ links. Facebook, Instagram, Twitter, and `mailto:` links do not count toward that threshold. A hero-only page with no gallery and no real paragraph is dropped as thin chrome.
+Drops Wix `copy-of-*` / `hs-*` drafts, placeholder “Click here to add your own text” pages, `home` / `about` / `contact` in every collection, Wix gallery-counter descriptions (`1/1`, `PAINTING1/1`), homepage/section hubs, and WordPress category indexes (including thin `/recipes/{category}` listings).
+
+A hub is dropped **even when it has a thumbnail gallery**: Wix/generic if there are 4+ in-content links and little prose; WordPress if there are 8+ links with little prose, 40+ links, a `/recipes/{slug}` (or similar collection) URL with 2+ links and no real paragraph, or a thumb listing with 3+ links and little prose. Facebook, Instagram, Twitter, and `mailto:` links do not count toward that threshold. Jetpack “Share this / Related” chrome is stripped before those counts. A hero-only page with no gallery and no real paragraph is dropped as thin chrome.
 
 Keepers are cleaned before write: `Title | Sitename` is stripped, ALL CAPS titles are title-cased, glued Wix descriptions are replaced with body prose, year headings and numeric slugs fill `1970-01-01`, the hero is omitted from `gallery`, leftover portfolio body images are promoted into `gallery`, and parent-nav headings that are only a markdown link are removed. Image-heavy Wix work pages are moved into `portfolio/`. Chrome and other-host images are not copied.
 
-After extractor changes, re-run `site-migrate prune` on an existing pack so `<pack>/pruned` matches current heuristics. Do not import `pruned-data/` leftovers from an older run.
+After extractor changes, re-run prune (or `migrate --resume`) so `<pack>/pruned` matches current heuristics.
 
 ## Implemented platforms
 
@@ -156,4 +160,4 @@ Other enum values (`ghost`, `framer`, …) are reserved for future plugins — s
 | `image-review.json`               | Flagged chrome / other-host / title-name / inline-blog images |
 | `astro-content.config.example.ts` | Astro collections starter                                     |
 
-`report.md` includes a **Coverage** table: missing HTML, missing Markdown, missing image downloads, leftover remote thumbs, and extra seeds that returned 404 (warnings only). Any coverage hole besides extra-seed 404s makes the CLI exit `2`.
+`report.md` includes a **Coverage** table: expected HTML (excluding 404s and `osd.xml`), missing HTML, missing Markdown, missing image downloads, leftover remote thumbs, and extra seeds that returned 404 (warnings only). Any coverage hole besides extra-seed 404s makes the CLI exit `2`. When prune runs, exit `2` is based on the **pruned** pack, not raw hubs.

@@ -138,13 +138,7 @@ export function isSkippedOnImport(
   options: { includeFlagged?: boolean; flagInlineBlog?: boolean },
 ): boolean {
   if (options.includeFlagged) return false;
-  if (
-    flags.includes("chrome") ||
-    flags.includes("other-host") ||
-    flags.includes("title-name-in-media")
-  ) {
-    return true;
-  }
-  if (options.flagInlineBlog !== false && flags.includes("inline-blog")) return true;
+  if (flags.includes("chrome") || flags.includes("other-host")) return true;
+  if (options.flagInlineBlog && flags.includes("inline-blog")) return true;
   return false;
 }

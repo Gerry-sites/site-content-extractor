@@ -109,13 +109,15 @@ site-migrate import <pack...> --target <astro-clone>
 site-migrate import ./output/pruned --target /path/to/astro-clone --locale en
 ```
 
-`--target` is required. Import `<pack>/pruned`, not the raw crawl. Protected slugs (`home`, `about`, `contact`) are skipped in every collection unless `--overwrite-pages` / `--overwrite-entries`. Flagged images stay out of `public/images/` unless `--include-flagged`. Body `/images/` refs are copied as well as `heroImage` / `gallery`. ALL CAPS titles are title-cased; glued Wix descriptions are replaced with body prose.
+`--target` is required. Import `<pack>/pruned`, not the raw crawl. Protected slugs (`home`, `about`, `contact`) are skipped in every collection unless `--overwrite-pages` / `--overwrite-entries`. Chrome and other-host images stay out of `public/images/` unless `--include-flagged`. `inline-blog` and `title-name-in-media` are review labels and copy by default. Body `/images/` refs are copied as well as `heroImage` / `gallery`. ALL CAPS titles are title-cased; glued Wix descriptions are replaced with body prose.
 
-Migrate writes keepers to `<pack>/pruned` by default. Section hubs are dropped even when they have a thumbnail gallery. Re-run heuristics after extractor changes with:
+Migrate writes keepers to `<pack>/pruned` by default. Section hubs are dropped even when they have a thumbnail gallery. Re-run heuristics after extractor changes with `migrate --resume` (rewrites `<pack>/pruned`) or:
 
 ```bash
 site-migrate prune ./packs/client --output ./pruned-data
 ```
+
+Import `<pack>/pruned`, not `pruned-data/`.
 
 ## Documentation
 

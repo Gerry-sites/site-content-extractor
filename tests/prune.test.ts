@@ -234,6 +234,72 @@ describe("prune heuristics", () => {
     );
     expect(galleryHub.keep).toBe(false);
     expect(galleryHub.reason).toBe("hub-index");
+
+    const recipeIndex = decideEntry(
+      {
+        folder: "blog",
+        slug: "salads",
+        title: "Salads",
+        description: "Catalan salad Dandelion salad",
+        body: [
+          "* – original recipe or inspired by Toulouse-Lautrec and Joyant",
+          "",
+          "SALADS",
+          "",
+          "![](/images/blog/salads-hero.jpg)",
+          "",
+          "[Catalan salad](https://blog.example.com/2018/12/07/about-one-salad/)",
+          "",
+          "![](/images/blog/salads-1.jpg)",
+          "",
+          "[Dandelion salad](https://blog.example.com/2015/04/02/about-dandelion/)",
+          "",
+          "![](/images/blog/salads-2.jpg)",
+          "",
+          "[Fava beans](https://blog.example.com/2015/05/22/about-fava/)",
+          "",
+          "### Share this:",
+          "",
+          "Like Loading...",
+        ].join("\n"),
+        frontmatter: {
+          heroImage: "/images/blog/salads-hero.jpg",
+          sourceUrl: "https://blog.example.com/recipes/salads",
+        },
+        siblingSlugs: siblings,
+      },
+      "wordpress",
+    );
+    expect(recipeIndex.keep).toBe(false);
+    expect(recipeIndex.reason).toBe("hub-index");
+
+    const shareOnly = decideEntry(
+      {
+        folder: "blog",
+        slug: "pf-2016",
+        title: "Pf 2016",
+        description: "above / powyżej: CUISINE AND ART PF 2016",
+        body: [
+          "above / powyżej: CUISINE AND ART “PF 2016”",
+          "",
+          "### Share this:",
+          "",
+          "Like Loading...",
+          "",
+          "### *Related*",
+          "",
+          '[Show](https://blog.example.com/2016/07/15/show/)July 15, 2016In "Events / Wydarzenia"',
+        ].join("\n"),
+        frontmatter: {
+          heroImage: "/images/blog/pf-2016-hero.jpg",
+          sourceUrl: "https://blog.example.com/2015/12/24/pf-2016",
+        },
+        siblingSlugs: siblings,
+      },
+      "wordpress",
+    );
+    expect(shareOnly.keep).toBe(false);
+    expect(shareOnly.reason).toBe("thin-chrome");
   });
 });
 

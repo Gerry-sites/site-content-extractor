@@ -78,4 +78,26 @@ describe("markdown cleanup helpers", () => {
     expect(isSocialOrMailHref("mailto:hi@example.com")).toBe(true);
     expect(isSocialOrMailHref("/landscape")).toBe(false);
   });
+
+  it("strips WordPress share/related chrome and bilingual image kickers", () => {
+    expect(looksLikeChromeDescription("above / powyżej: ALBI (FR) by Cuisine And Art")).toBe(true);
+    const body = [
+      "above / powyżej: PF 2016",
+      "",
+      "### Share this:",
+      "",
+      "Like Loading...",
+      "",
+      "### *Related*",
+      "",
+      '[Show](https://blog.example.com/2016/07/15/show/)July 15, 2016In "Events / Wydarzenia"',
+    ].join("\n");
+    const cleaned = cleanMarkdownBody(body, "Pf 2016");
+    expect(cleaned).not.toContain("Share this");
+    expect(cleaned).not.toContain("Like Loading");
+    expect(cleaned).not.toContain("Related");
+    expect(cleaned).not.toContain("July 15");
+    expect(firstProseParagraph(cleaned)).toBeUndefined();
+    expect(cleanMarkdownBody("[](#unique-identifier)Hello forest.")).toBe("Hello forest.");
+  });
 });

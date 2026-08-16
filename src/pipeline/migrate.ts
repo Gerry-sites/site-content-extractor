@@ -302,11 +302,26 @@ export const collections = { pages, blog };
     skipImages: options.skipImages || !options.images,
   });
 
-  // 7. Validate
-  const validation = await validateOutput(outputDir);
-  for (const issue of validation.issues) {
+  // 7. Validate the importable pack (pruned when prune runs)
+  const rawValidation = await validateOutput(outputDir);
+  for (const issue of rawValidation.issues) {
     warnings.push(`[${issue.level}] ${issue.file}: ${issue.message}`);
   }
+
+  let prunedValidationOk = rawValidation.ok;
+  if (!options.skipPrune) {
+    const prunedDir = path.join(outputDir, "pruned");
+    const pruned = await prunePack(outputDir, prunedDir);
+    logger.info(
+      `Pruned ${pruned.kept.length} keepers (${pruned.dropped.length} dropped) → ${prunedDir}`,
+    );
+    const prunedValidation = await validateOutput(prunedDir);
+    for (const issue of prunedValidation.issues) {
+      warnings.push(`[pruned ${issue.level}] ${issue.file}: ${issue.message}`);
+    }
+    prunedValidationOk = prunedValidation.ok;
+  }
+
   if (coverage.missingHtml.length) {
     warnings.push(`[error] Coverage: missing HTML for ${coverage.missingHtml.length} URL(s)`);
   }
@@ -349,13 +364,16 @@ export const collections = { pages, blog };
       "Platform detected as generic. Consider adding a dedicated extractor plugin for cleaner results.",
     );
   }
-  const flagged = review.filter((entry) => entry.flags.length > 0);
-  recommendations.push(
-    "Import with `site-migrate import <pack> --target <astro-clone>` after reviewing image-review.json.",
+  const skipOnImport = review.filter(
+    (entry) =>
+      entry.flags.includes("chrome") || entry.flags.includes("other-host"),
   );
-  if (flagged.length) {
+  recommendations.push(
+    "Import with `site-migrate import <pack>/pruned --target <astro-clone>` after reviewing image-review.json.",
+  );
+  if (skipOnImport.length) {
     recommendations.push(
-      `${flagged.length} images were flagged (chrome, other-host, title-name-in-media, or inline-blog). Import skips them unless --include-flagged.`,
+      `${skipOnImport.length} chrome/other-host images are skipped on import unless --include-flagged. inline-blog and title-name-in-media are review labels only.`,
     );
   }
 
@@ -383,14 +401,6 @@ export const collections = { pages, blog };
   await writeJson(path.join(outputDir, "report.json"), report);
   await writeReport(outputDir, report);
 
-  if (!options.skipPrune) {
-    const prunedDir = path.join(outputDir, "pruned");
-    const pruned = await prunePack(outputDir, prunedDir);
-    logger.info(
-      `Pruned ${pruned.kept.length} keepers (${pruned.dropped.length} dropped) → ${prunedDir}`,
-    );
-  }
-
   logger.info("");
   logger.info("Migration Summary");
   logger.info(`  Pages:        ${report.pages}`);
@@ -398,13 +408,15 @@ export const collections = { pages, blog };
   logger.info(`  Images:       ${report.images}`);
   logger.info(`  Broken Images:${report.brokenImages.length}`);
   logger.info(`  Warnings:     ${report.warnings.length}`);
-  logger.info(`  Coverage:     ${coverage.withHtml}/${coverage.discovered} HTML`);
+  logger.info(
+    `  Coverage:     ${coverage.withHtml}/${coverage.htmlExpected} HTML (${coverage.discovered} discovered)`,
+  );
   logger.info(`  Output:       ${outputDir}`);
 
   return {
     report,
     outputDir,
     platform: extractor.name,
-    validationOk: validation.ok && !coverageHasHoles(coverage),
+    validationOk: prunedValidationOk && !coverageHasHoles(coverage),
   };
 }

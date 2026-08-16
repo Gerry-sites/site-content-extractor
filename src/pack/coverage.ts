@@ -10,6 +10,7 @@ export type SeedMissing = {
 export type Coverage = {
   discovered: number;
   withHtml: number;
+  htmlExpected: number;
   missingHtml: string[];
   missingMarkdown: string[];
   missingImages: string[];
@@ -26,14 +27,17 @@ export function coverageHasHoles(coverage: Coverage): boolean {
   );
 }
 
+export function contentPages(pages: DiscoveredPage[]): DiscoveredPage[] {
+  return pages.filter((page) => {
+    if (page.status && page.status >= 400) return false;
+    if (isLowValueCrawlUrl(page.normalizedUrl)) return false;
+    return true;
+  });
+}
+
 export function missingHtmlUrls(pages: DiscoveredPage[], htmlByUrl: Map<string, string>): string[] {
-  return pages
-    .filter((page) => {
-      if (htmlByUrl.has(page.normalizedUrl)) return false;
-      if (isLowValueCrawlUrl(page.normalizedUrl)) return false;
-      if (page.status && page.status >= 400) return false;
-      return true;
-    })
+  return contentPages(pages)
+    .filter((page) => !htmlByUrl.has(page.normalizedUrl))
     .map((page) => page.normalizedUrl);
 }
 
@@ -111,9 +115,11 @@ export function buildCoverage(input: {
   const leftoverRemote = [
     ...new Set(input.markdownContents.flatMap((content) => leftoverRemoteUrls(content))),
   ];
+  const content = contentPages(input.pages);
   return {
     discovered: input.pages.length,
-    withHtml: input.pages.filter((page) => input.htmlByUrl.has(page.normalizedUrl)).length,
+    withHtml: content.filter((page) => input.htmlByUrl.has(page.normalizedUrl)).length,
+    htmlExpected: content.length,
     missingHtml: missingHtmlUrls(input.pages, input.htmlByUrl),
     missingMarkdown: missingMarkdownUrls(input.extracted, input.writtenByUrl),
     missingImages: input.skipImages

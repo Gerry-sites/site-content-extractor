@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reviewImage, titleNameTokens } from "../src/review/images.js";
+import { reviewImage, titleNameTokens, isSkippedOnImport } from "../src/review/images.js";
 
 describe("image review flags", () => {
   it("flags a blog illustration when a title name appears in the alt text", () => {
@@ -44,5 +44,13 @@ describe("image review flags", () => {
       pageKind: "blog",
     });
     expect(flags).toContain("other-host");
+  });
+
+  it("skips only chrome and other-host on import unless inline-blog is opted in", () => {
+    expect(isSkippedOnImport(["inline-blog", "title-name-in-media"], {})).toBe(false);
+    expect(isSkippedOnImport(["inline-blog"], { flagInlineBlog: true })).toBe(true);
+    expect(isSkippedOnImport(["chrome"], {})).toBe(true);
+    expect(isSkippedOnImport(["other-host"], {})).toBe(true);
+    expect(isSkippedOnImport(["chrome", "inline-blog"], { includeFlagged: true })).toBe(false);
   });
 });

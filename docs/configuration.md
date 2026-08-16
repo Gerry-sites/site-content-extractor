@@ -68,4 +68,4 @@ site-migrate import ./output/pruned --target /path/to/astro-clone --locale en
 
 The importer copies new `portfolio/` and `blog/` slugs into `src/content/{collection}/{locale}/` and unflagged binaries into `public/images/`. Every `/images/` path in frontmatter and the Markdown body is copied, not only `heroImage` / `gallery`. The hero is omitted from `gallery`. Filling an existing entry keeps extra clone keys (`medium`, `featured`, …) and merges gallery paths.
 
-Protected slugs (`home`, `about`, `contact` by default) are skipped in **every** collection unless `--overwrite-pages` (for `pages/`) or `--overwrite-entries` (for portfolio/blog). Review `image-review.json` first.
+Protected slugs (`home`, `about`, `contact` by default) are skipped in **every** collection unless `--overwrite-pages` (for `pages/`) or `--overwrite-entries` (for portfolio/blog). Review `image-review.json` first. Import skips chrome and other-host unless `--include-flagged`. `inline-blog` and `title-name-in-media` copy by default; pass `--flag-inline-blog` to skip inlines.

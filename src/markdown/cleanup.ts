@@ -22,6 +22,8 @@ export function looksLikeChromeDescription(text: string): boolean {
   const trimmed = text.replace(/\u200b/g, "").replace(/\s+/g, " ").trim();
   if (!trimmed) return true;
   if (/click to see larger/i.test(trimmed)) return true;
+  if (/^(above|below)\s*\/\s+\S/i.test(trimmed) && trimmed.length < 140) return true;
+  if (/^like loading/i.test(trimmed)) return true;
   if (YEAR_LINE.test(trimmed)) return true;
   if (/^\d+\s*\/\s*\d+$/.test(trimmed)) return true;
   const compact = trimmed.replace(/\s+/g, "");
@@ -109,6 +111,15 @@ export function cleanMarkdownBody(body: string, title?: string): string {
     return full;
   });
   next = next.replace(/^.*click to see larger.*$/gim, "");
+  next = next.replace(/^#{1,6}\s+\*?Share this:?\*?\s*$/gim, "");
+  next = next.replace(/^Like Loading\.+\s*$/gim, "");
+  next = next.replace(
+    /^\[[^\]]+\]\([^)]+\)(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}In\s+"[^"]+"\s*$/gim,
+    "",
+  );
+  next = next.replace(/^#{1,6}\s+\*?Related\*?\s*$/gim, "");
+  next = next.replace(/\[!\[[^\]]*\]\([^)]+\)\]\(#unique-identifier\)\s*/g, "");
+  next = next.replace(/\[\]\(#unique-identifier\)/g, "");
   if (title) {
     const heading = stripTitleSuffix(title).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     next = next.replace(new RegExp(`^#{1,6}\\s+${heading}\\s*$`, "gim"), "");
