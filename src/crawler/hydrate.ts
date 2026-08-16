@@ -1,3 +1,5 @@
+import type { Page } from "playwright";
+
 const LOAD_MORE_RE = /load more|show more|more posts|see more/i;
 
 export type HydratedImage = {
@@ -36,4 +38,34 @@ export function injectResourceImages(html: string, resourceUrls: string[]): stri
 
 export function isLoadMoreLabel(text: string): boolean {
   return LOAD_MORE_RE.test(text.replace(/\s+/g, " ").trim());
+}
+
+export async function scrollPage(page: Page, steps = 12): Promise<void> {
+  for (let i = 0; i < steps; i += 1) {
+    await page.evaluate(() => window.scrollBy(0, Math.max(window.innerHeight, 400)));
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
+/**
+ * Poll until image/resource counts stop growing, or `capMs` elapses.
+ */
+export async function waitForStableImages(page: Page, capMs = 15_000): Promise<void> {
+  let last = -1;
+  let stableMs = 0;
+  const started = Date.now();
+  while (Date.now() - started < capMs) {
+    const count = await page.evaluate(
+      () => document.images.length + performance.getEntriesByType("resource").length,
+    );
+    if (count === last) {
+      stableMs += 400;
+      if (stableMs >= 1_000) return;
+    } else {
+      stableMs = 0;
+      last = count;
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  }
 }

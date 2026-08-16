@@ -49,7 +49,16 @@ export function isLowValueCrawlUrl(url: string): boolean {
     ) {
       return true;
     }
-    if (parsed.searchParams.has("share") || parsed.searchParams.has("replytocom")) {
+    if (
+      parsed.searchParams.has("share") ||
+      parsed.searchParams.has("replytocom") ||
+      parsed.searchParams.has("attachment_id")
+    ) {
+      return true;
+    }
+    if (parts.includes("attachment") || /\/attachment(\/|$)/.test(path)) return true;
+    if (/\/wp-content\/uploads\//i.test(path)) return true;
+    if (path === "/" && parsed.search.length > 1 && !parsed.searchParams.has("p")) {
       return true;
     }
     return false;

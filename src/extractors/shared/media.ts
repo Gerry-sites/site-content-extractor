@@ -139,6 +139,8 @@ export function detectGalleries($: CheerioAPI, pageUrl: string): Gallery[] {
   const gallerySelectors = [
     "[class*='gallery']",
     "[class*='Gallery']",
+    "[id*='gallery']",
+    "[id*='Gallery']",
     "[data-testid*='gallery']",
     ".pro-gallery",
     ".wixui-gallery",

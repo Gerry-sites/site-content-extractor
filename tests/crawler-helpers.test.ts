@@ -46,6 +46,12 @@ describe("seed URLs", () => {
       isLowValueCrawlUrl("https://blog.example.com/2015/12/30/about-albi-museum/www-albi-03"),
     ).toBe(true);
     expect(isLowValueCrawlUrl("https://blog.example.com/2015/12/30/about-albi-museum")).toBe(false);
+    expect(
+      isLowValueCrawlUrl("https://blog.example.com/wp-content/uploads/2020/01/dish.jpg"),
+    ).toBe(true);
+    expect(isLowValueCrawlUrl("https://blog.example.com/?pushpress=hub")).toBe(true);
+    expect(isLowValueCrawlUrl("https://blog.example.com/?attachment_id=99")).toBe(true);
+    expect(isLowValueCrawlUrl("https://blog.example.com/photo/attachment/photo-file")).toBe(true);
   });
 
   it("lists feed discovery URLs on the seed origin", () => {
@@ -88,6 +94,19 @@ describe("WordPress REST discovery", () => {
       fetchImpl,
     );
     expect(urls).toContain("https://blog.example.com/hello-post");
-    expect(calls[0]).toContain("/wp-json/wp/v2/posts");
+    expect(calls.some((url) => url.includes("/wp-json/wp/v2/posts"))).toBe(true);
+    expect(calls.some((url) => url.includes("/wp-json/wp/v2/pages"))).toBe(true);
+  });
+
+  it("does not call wordpress.com for loopback hosts", async () => {
+    const calls: string[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return new Response("no", { status: 404 });
+    }) as typeof fetch;
+
+    await discoverWordpressPostUrls("http://127.0.0.1:9/", "test-agent", fetchImpl);
+    expect(calls.every((url) => !url.includes("wordpress.com"))).toBe(true);
+    expect(calls.some((url) => url.includes("/wp-json/wp/v2/pages"))).toBe(true);
   });
 });

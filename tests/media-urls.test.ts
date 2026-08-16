@@ -6,6 +6,7 @@ import {
   upgradeWixUrl,
   wixMediaId,
   wordpressOriginalUrl,
+  stripSkippableImages,
 } from "../src/media/urls.js";
 
 const WIX_THUMB =
@@ -47,6 +48,13 @@ describe("Wix media URLs", () => {
       isSkippableAsset("https://static.wixstatic.com/media/ce6ec7c11b174c0581e20f42bb865ce3.png"),
     ).toBe(true);
     expect(isSkippableAsset(WIX_THUMB)).toBe(false);
+  });
+
+  it("strips Wix chrome img tags from HTML", () => {
+    const html = `<p>Hi</p><img src="${WIX_ICON}" alt="fb" /><img src="${WIX_THUMB}" alt="Art" />`;
+    const next = stripSkippableImages(html);
+    expect(next).not.toContain("ce6ec7c11b174c0581e20f42bb865ce3");
+    expect(next).toContain(WIX_THUMB);
   });
 });
 

@@ -40,7 +40,7 @@ describe("markdown generation", () => {
     expect(frontmatter.title).toBe("About Us");
     expect(frontmatter.slug).toBe("about");
     expect(frontmatter.description).toBe("Who we are");
-    expect(frontmatter.date).toBeTruthy();
+    expect(frontmatter.date).toBeUndefined();
     expect(frontmatter.sourceUrl).toBe("https://example.com/about");
     expect(body).toContain("/images/pages/about.jpg");
     expect(body).not.toContain("https://cdn.example.com/a.jpg");
@@ -70,6 +70,28 @@ describe("markdown generation", () => {
     expect(result.content).toContain("/images/pages/about-hero.jpg");
     expect(result.content).not.toContain("static.wixstatic.com");
     expect(result.content).not.toContain("w_215");
+  });
+
+  it("strips skippable Wix chrome images from the body", () => {
+    const chrome =
+      "https://static.wixstatic.com/media/ce6ec7c11b174c0581e20f42bb865ce3.png/v1/fill/w_18,h_18,al_c,q_85/ce6ec7c11b174c0581e20f42bb865ce3.png";
+    const page: ExtractedPage = {
+      url: "https://studio.example.com/about",
+      title: "About",
+      description: "Bio",
+      slug: "about",
+      headings: [],
+      htmlContent: `<p>Hi</p><img src="${chrome}" alt="fb" />`,
+      images: [],
+      links: [],
+      videos: [],
+      files: [],
+      galleries: [],
+      isBlogPost: false,
+      kind: "page",
+    };
+    const result = generateMarkdown(page, new Map());
+    expect(result.content).not.toContain("ce6ec7c11b174c0581e20f42bb865ce3");
   });
 
   it("emits gallery frontmatter for gallery pages", () => {

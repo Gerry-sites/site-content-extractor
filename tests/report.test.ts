@@ -36,7 +36,8 @@ describe("migration report", () => {
     expect(md).toContain("## Missing Metadata");
     expect(md).toContain("## Warnings");
     expect(md).toContain("## Recommendations");
-    expect(md).toContain("## Review");
+    expect(md).toContain("## Coverage");
+    expect(md).toContain("| Missing HTML |");
     expect(md).toContain("image-review.json");
     expect(md).toContain("Platform:** Wix");
   });

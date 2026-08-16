@@ -14,8 +14,12 @@ describe("pack validation", () => {
       "utf8",
     );
     const result = await validateOutput(dir);
-    expect(result.ok).toBe(false);
-    expect(result.issues.some((issue) => /1970-01-01/.test(issue.message))).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(
+      result.issues.some(
+        (issue) => issue.level === "warning" && /1970-01-01/.test(issue.message),
+      ),
+    ).toBe(true);
   });
 
   it("fails when description is missing", async () => {
@@ -29,5 +33,35 @@ describe("pack validation", () => {
     const result = await validateOutput(dir);
     expect(result.ok).toBe(false);
     expect(result.issues.some((issue) => /Missing description/.test(issue.message))).toBe(true);
+  });
+
+  it("fails blog entries that still have the placeholder date", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "site-migrate-validate-"));
+    await mkdir(path.join(dir, "blog"), { recursive: true });
+    await writeFile(
+      path.join(dir, "blog/stew.md"),
+      "---\ntitle: Stew\ndescription: Food\nslug: stew\ndate: 1970-01-01\n---\n\nBody.\n",
+      "utf8",
+    );
+    const result = await validateOutput(dir);
+    expect(result.ok).toBe(false);
+    expect(result.issues.some((issue) => issue.level === "error" && /1970-01-01/.test(issue.message))).toBe(
+      true,
+    );
+  });
+
+  it("fails when a content image is still a remote URL", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "site-migrate-validate-"));
+    await mkdir(path.join(dir, "pages"), { recursive: true });
+    await writeFile(
+      path.join(dir, "pages/home.md"),
+      "---\ntitle: Home\ndescription: Hi\nslug: home\n---\n\n![A](https://cdn.example.com/a.jpg)\n",
+      "utf8",
+    );
+    const result = await validateOutput(dir);
+    expect(result.ok).toBe(false);
+    expect(result.issues.some((issue) => /Remote content image remains/.test(issue.message))).toBe(
+      true,
+    );
   });
 });

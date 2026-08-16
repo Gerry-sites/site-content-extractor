@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { genericExtractor } from "../src/extractors/generic/index.js";
 import { wixExtractor } from "../src/extractors/wix/index.js";
 import { wordpressExtractor } from "../src/extractors/wordpress/index.js";
+import { packFolder } from "../src/pack/paths.js";
 
 const fixtures = path.join(process.cwd(), "tests/fixtures");
 
@@ -88,6 +89,7 @@ describe("wix extractor", () => {
       seedUrl: "https://studio.example.com/",
     });
     expect(gallery.kind).toBe("gallery");
+    expect(gallery.kind).not.toBe("page");
     expect(gallery.images.length).toBeGreaterThanOrEqual(4);
     expect(gallery.images.every((img) => img.src.includes("/v1/fit/w_1800"))).toBe(true);
 
@@ -97,6 +99,11 @@ describe("wix extractor", () => {
       seedUrl: "https://studio.example.com/",
     });
     expect(about.kind).toBe("page");
+    expect(packFolder(gallery.kind, gallery.isBlogPost)).toBe("portfolio");
+    expect(packFolder(about.kind, about.isBlogPost)).toBe("pages");
+    expect(packFolder(gallery.kind, gallery.isBlogPost)).not.toBe(
+      packFolder(about.kind, about.isBlogPost),
+    );
   });
 });
 

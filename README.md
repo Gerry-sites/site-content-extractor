@@ -89,14 +89,15 @@ site-migrate import <pack...> --target <astro-clone>
 | `--depth <n>`                  | `10`              | Max crawl depth                                                    |
 | `--platform <name>`            | `auto`            | `auto`, `generic`, `wix`, `wordpress`, `webflow`, `squarespace`, … |
 | `--paths <list>`               | `/about,/contact` | Extra seed paths (comma-separated)                                 |
+| `--timeout`                    | `90000`           | Playwright navigation timeout (ms)                                 |
 | `--settle-ms <n>`              | `2500`            | Wait after `networkidle` so JS galleries hydrate                   |
 | `--headless` / `--no-headless` | headless          | Browser mode                                                       |
-| `--resume`                     | off               | Resume from existing `pages.json` / image manifest                 |
+| `--resume`                     | off               | Recrawl only URLs that still have no cached HTML                   |
 | `--overwrite`                  | off               | Replace existing output directory                                  |
 | `--skip-images`                | off               | Skip image downloads                                               |
 | `--skip-blog`                  | off               | Do not classify pages as blog posts                                |
 | `--no-respect-robots`          | off               | Ignore robots.txt                                                  |
-| `--concurrency <n>`            | `3`               | Parallel crawl/download workers                                    |
+| `--concurrency <n>`            | `2`               | Parallel crawl/download workers                                    |
 | `--responsive-images`          | off               | Generate width variants with Sharp                                 |
 | `--json-export`                | off               | Also write `content.json`                                          |
 | `--verbose`                    | off               | Debug logging                                                      |

@@ -154,6 +154,19 @@ export const MigrationReportSchema = z.object({
   missingMetadata: z.array(z.string()).default([]),
   warnings: z.array(z.string()).default([]),
   recommendations: z.array(z.string()).default([]),
+  coverage: z
+    .object({
+      discovered: z.number().int().nonnegative(),
+      withHtml: z.number().int().nonnegative(),
+      missingHtml: z.array(z.string()).default([]),
+      missingMarkdown: z.array(z.string()).default([]),
+      missingImages: z.array(z.string()).default([]),
+      leftoverRemote: z.array(z.string()).default([]),
+      seedMissing: z
+        .array(z.object({ path: z.string(), status: z.number().optional() }))
+        .default([]),
+    })
+    .optional(),
 });
 
 export type SiteMetadata = z.infer<typeof SiteMetadataSchema>;

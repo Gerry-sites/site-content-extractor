@@ -3,6 +3,7 @@ import { copyFile } from "node:fs/promises";
 import type { ExtractedPage } from "../types/schemas.js";
 import type { DownloadedImage } from "../download/images.js";
 import { ensureDir, exists } from "../utils/fs.js";
+import { isSkippableAsset, upgradeMediaUrl } from "../media/urls.js";
 import {
   extFromPath,
   packFileFromSitePath,
@@ -35,8 +36,10 @@ export async function assignSiteImagePaths(
     }
 
     for (const remote of ordered) {
-      const downloaded = byRemoteUrl.get(remote);
+      const downloaded =
+        byRemoteUrl.get(remote) || byRemoteUrl.get(upgradeMediaUrl(remote));
       if (!downloaded) continue;
+      if (isSkippableAsset(remote)) continue;
       const ext = extFromPath(downloaded.relativePath);
       const sitePath =
         remote === page.heroImage && !sitePaths.has(remote)
@@ -45,6 +48,7 @@ export async function assignSiteImagePaths(
 
       if (!sitePaths.has(remote)) {
         sitePaths.set(remote, sitePath);
+        sitePaths.set(upgradeMediaUrl(remote), sitePath);
         const dest = path.join(outputDir, packFileFromSitePath(sitePath));
         await ensureDir(path.dirname(dest));
         if (!(await exists(dest))) {

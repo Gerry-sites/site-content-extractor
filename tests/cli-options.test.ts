@@ -12,8 +12,8 @@ describe("CLI options schema", () => {
     expect(parsed.platform).toBe("auto");
     expect(parsed.headless).toBe(true);
     expect(parsed.respectRobots).toBe(true);
-    expect(parsed.concurrency).toBe(3);
-    expect(parsed.timeoutMs).toBe(30_000);
+    expect(parsed.concurrency).toBe(2);
+    expect(parsed.timeoutMs).toBe(90_000);
     expect(parsed.settleMs).toBe(2_500);
     expect(parsed.paths).toEqual(["/about", "/contact"]);
     expect(parsed.skipImages).toBe(false);

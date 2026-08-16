@@ -42,6 +42,15 @@ export function isSkippableAsset(url: string): boolean {
   return false;
 }
 
+/** Remove Wix chrome / data-URI imgs so they never land in Markdown. */
+export function stripSkippableImages(html: string): string {
+  return html.replace(/<img\b[^>]*>/gi, (tag) => {
+    const src = tag.match(/\bsrc=["']([^"']+)["']/i)?.[1];
+    if (src && isSkippableAsset(src)) return "";
+    return tag;
+  });
+}
+
 /**
  * Prefer a large JPEG instead of Wix cropped gallery thumbs (`/v1/fill/w_290,...`).
  */

@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { exists } from "../utils/fs.js";
 import { parseFrontmatter } from "../markdown/frontmatter.js";
 import { FrontmatterSchema } from "../types/schemas.js";
+import { isSkippableAsset } from "../media/urls.js";
 
 export type ValidationIssue = {
   file: string;
@@ -68,11 +69,18 @@ export async function validateOutput(outputDir: string): Promise<ValidationResul
       slugs.set(fm.slug, rel);
     }
 
-    const isDatedCollection = rel.startsWith("blog/") || rel.startsWith("portfolio/");
-    if (isDatedCollection && (!fm.date || fm.date === "1970-01-01")) {
+    const isBlog = rel.startsWith("blog/");
+    const isPortfolio = rel.startsWith("portfolio/");
+    if (isBlog && (!fm.date || fm.date === "1970-01-01")) {
       issues.push({
         file: rel,
         level: "error",
+        message: "Missing real date (1970-01-01 means article date was not found)",
+      });
+    } else if (isPortfolio && (!fm.date || fm.date === "1970-01-01")) {
+      issues.push({
+        file: rel,
+        level: "warning",
         message: "Missing real date (1970-01-01 means article date was not found)",
       });
     }
@@ -86,10 +94,11 @@ export async function validateOutput(outputDir: string): Promise<ValidationResul
 
     for (const ref of imageRefs) {
       if (/^https?:\/\//i.test(ref)) {
+        if (isSkippableAsset(ref)) continue;
         issues.push({
           file: rel,
-          level: "warning",
-          message: `Remote image reference remains: ${ref}`,
+          level: "error",
+          message: `Remote content image remains: ${ref}`,
         });
         continue;
       }
@@ -132,7 +141,9 @@ async function collectMarkdownFiles(dir: string): Promise<string[]> {
     for (const entry of entries) {
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === "images" || entry.name === "node_modules") continue;
+        if (entry.name === "images" || entry.name === "node_modules" || entry.name === "html") {
+          continue;
+        }
         await walk(full);
       } else if (entry.isFile() && entry.name.endsWith(".md") && entry.name !== "report.md") {
         results.push(full);

@@ -11,6 +11,16 @@ type WpComPost = {
   link?: string;
 };
 
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  return (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host === "::1" ||
+    /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)
+  );
+}
+
 function queueLink(raw: string | undefined, seedUrl: string, into: Set<string>) {
   if (!raw) return;
   if (!isInternalLink(raw, seedUrl) || isAssetUrl(raw)) return;
@@ -29,9 +39,12 @@ export async function discoverWordpressPostUrls(
   const origin = new URL(seedUrl).origin;
   const hostname = new URL(seedUrl).hostname.replace(/^www\./, "");
 
-  const fromV2 = await fetchWpV2(origin, seedUrl, userAgent, fetchImpl);
-  for (const url of fromV2) found.add(url);
+  const fromPosts = await fetchWpV2(origin, seedUrl, "posts", userAgent, fetchImpl);
+  const fromPages = await fetchWpV2(origin, seedUrl, "pages", userAgent, fetchImpl);
+  for (const url of fromPosts) found.add(url);
+  for (const url of fromPages) found.add(url);
   if (found.size) return [...found];
+  if (isLoopbackHost(hostname)) return [...found];
 
   const fromCom = await fetchWpCom(hostname, seedUrl, userAgent, fetchImpl);
   for (const url of fromCom) found.add(url);
@@ -41,6 +54,7 @@ export async function discoverWordpressPostUrls(
 async function fetchWpV2(
   origin: string,
   seedUrl: string,
+  collection: "posts" | "pages",
   userAgent: string,
   fetchImpl: RestFetch,
 ): Promise<string[]> {
@@ -48,7 +62,7 @@ async function fetchWpV2(
   let page = 1;
   let totalPages = 1;
   while (page <= totalPages && page <= 50) {
-    const url = `${origin}/wp-json/wp/v2/posts?per_page=100&page=${page}`;
+    const url = `${origin}/wp-json/wp/v2/${collection}?per_page=100&page=${page}`;
     try {
       const res = await fetchImpl(url, {
         headers: {

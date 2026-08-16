@@ -40,6 +40,8 @@ site-migrate https://mysite.com --platform=wix
 site-migrate https://mysite.com --output ./migrated --resume
 ```
 
+`--resume` reuses `pages.json`, `html-index.json`, and already-downloaded images. It recrawls **only URLs that still have no cached HTML**. Markdown files not produced in this run are removed so a page cannot linger in both `pages/` and `portfolio/`.
+
 ### Skip images (content-only pass)
 
 ```bash
@@ -69,10 +71,10 @@ Default extra seeds are `/about` and `/contact`. `--settle-ms` waits after `netw
 ### Tune crawl parallelism and timeouts
 
 ```bash
-site-migrate https://mysite.com --concurrency 5 --timeout 60000
+site-migrate https://mysite.com --concurrency 2 --timeout 90000
 ```
 
-`--timeout` maps to the Playwright navigation timeout (`timeoutMs` in the config schema).
+Defaults are `--concurrency 2` and `--timeout 90000`. `--timeout` maps to the Playwright navigation timeout (`timeoutMs` in the config schema). The crawler also scrolls the page and waits until image counts stop growing so JS galleries can hydrate.
 
 ### Import a pack into an Astro starter clone
 
@@ -109,7 +111,7 @@ Other enum values (`ghost`, `framer`, …) are reserved for future plugins — s
 | ---- | ----------------------------------------------- |
 | `0`  | Success                                         |
 | `1`  | Fatal error (invalid args, crawl failure, etc.) |
-| `2`  | Completed with validation errors                |
+| `2`  | Completed with validation or coverage holes     |
 
 ## Output files
 
@@ -125,6 +127,9 @@ Other enum values (`ghost`, `framer`, …) are reserved for future plugins — s
 | `sitemap.json`                    | Discovered URL list                                           |
 | `pages.json`                      | Crawl manifest (resume support)                               |
 | `images-manifest.json`            | Image download resume support                                 |
-| `report.md`                       | Human-readable summary (includes Review section)              |
+| `report.md`                       | Human-readable summary (Coverage + Review)                    |
+| `html/` / `html-index.json`       | Cached hydrated HTML for `--resume`                           |
 | `image-review.json`               | Flagged chrome / other-host / title-name / inline-blog images |
 | `astro-content.config.example.ts` | Astro collections starter                                     |
+
+`report.md` includes a **Coverage** table: missing HTML, missing Markdown, missing image downloads, leftover remote thumbs, and extra seeds that returned 404 (warnings only). Any coverage hole besides extra-seed 404s makes the CLI exit `2`.

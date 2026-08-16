@@ -12,11 +12,19 @@ import path from "node:path";
 import { discoveryFeedUrls, extraSeedUrls, isLowValueCrawlUrl } from "./seeds.js";
 import { discoverFeedUrls } from "./feeds.js";
 import { discoverWordpressPostUrls } from "./wordpress-rest.js";
-import { applyCurrentSrc, injectResourceImages } from "./hydrate.js";
+import {
+  applyCurrentSrc,
+  injectResourceImages,
+  scrollPage,
+  waitForStableImages,
+} from "./hydrate.js";
+import { loadHtmlCache, saveHtmlPage, writeHtmlIndex, type HtmlIndex } from "./html-cache.js";
+import type { SeedMissing } from "../pack/coverage.js";
 
 export type CrawlResult = {
   manifest: PagesManifest;
   htmlByUrl: Map<string, string>;
+  seedMissing: SeedMissing[];
 };
 
 export type CrawlerOptions = Pick<
@@ -62,15 +70,25 @@ function enqueue(
 export async function crawlSite(options: CrawlerOptions, logger: Logger): Promise<CrawlResult> {
   const seedUrl = normalizeUrl(options.url);
   const manifestPath = path.join(options.output, "pages.json");
-  const htmlByUrl = new Map<string, string>();
   const settleMs = options.settleMs ?? 2_500;
+  const extraSeeds = new Set(extraSeedUrls(seedUrl, options.paths));
+  const seedMissing: SeedMissing[] = [];
 
   const queue: Array<{ url: string; depth: number; source: DiscoveredPage["source"] }> = [];
   const discovered = new Map<string, DiscoveredPage>();
 
+  let htmlByUrl = new Map<string, string>();
+  let htmlIndex: HtmlIndex = {};
+  if (options.resume) {
+    const cached = await loadHtmlCache(options.output);
+    htmlByUrl = cached.htmlByUrl;
+    htmlIndex = cached.index;
+  }
+
   if (options.resume && (await exists(manifestPath))) {
     const existing = PagesManifestSchema.parse(await readJson(manifestPath));
     for (const page of existing.pages) {
+      if (isLowValueCrawlUrl(page.normalizedUrl) || isAssetUrl(page.normalizedUrl)) continue;
       discovered.set(page.normalizedUrl, page);
       queue.push({
         url: page.normalizedUrl,
@@ -78,7 +96,9 @@ export async function crawlSite(options: CrawlerOptions, logger: Logger): Promis
         source: "resume",
       });
     }
-    logger.info(`Resuming with ${discovered.size} pages from pages.json`);
+    logger.info(
+      `Resuming with ${discovered.size} pages from pages.json (${htmlByUrl.size} cached HTML)`,
+    );
   } else {
     queue.push({ url: seedUrl, depth: 0, source: "seed" });
     discovered.set(seedUrl, {
@@ -96,7 +116,7 @@ export async function crawlSite(options: CrawlerOptions, logger: Logger): Promis
     logger.debug("Loaded robots.txt rules");
   }
 
-  for (const extra of extraSeedUrls(seedUrl, options.paths)) {
+  for (const extra of extraSeeds) {
     enqueue(discovered, queue, extra, seedUrl, 1, "seed", options.respectRobots, isAllowed);
   }
 
@@ -130,8 +150,8 @@ export async function crawlSite(options: CrawlerOptions, logger: Logger): Promis
     context.setDefaultTimeout(options.timeoutMs);
 
     const limit = pLimit(options.concurrency);
-    const pending = [...queue];
-    const visited = new Set<string>();
+    const pending = queue.filter((item) => !htmlByUrl.has(item.url));
+    const visited = new Set<string>(htmlByUrl.keys());
 
     while (pending.length > 0) {
       const batch = pending.splice(0, options.concurrency);
@@ -167,9 +187,6 @@ export async function crawlSite(options: CrawlerOptions, logger: Logger): Promis
                 }
               }
               if (lastError) throw lastError;
-              await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
-              await new Promise((r) => setTimeout(r, settleMs));
-              await clickLoadMore(page, 20);
 
               const status = response?.status();
               const contentType = response?.headers()["content-type"] ?? "";
@@ -181,17 +198,34 @@ export async function crawlSite(options: CrawlerOptions, logger: Logger): Promis
 
               if (status && status >= 400) {
                 logger.warn(`HTTP ${status} for ${item.url}`);
+                if (extraSeeds.has(item.url)) {
+                  try {
+                    seedMissing.push({
+                      path: new URL(item.url).pathname,
+                      status,
+                    });
+                  } catch {
+                    seedMissing.push({ path: item.url, status });
+                  }
+                }
                 return;
               }
               if (contentType && !contentType.includes("text/html")) {
                 return;
               }
 
+              await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
+              await new Promise((r) => setTimeout(r, settleMs));
+              await clickLoadMore(page, 20);
+              await scrollPage(page);
+              await waitForStableImages(page);
+
               const title = await page.title();
               if (entry) entry.title = title;
 
               const html = await hydratePageHtml(page);
               htmlByUrl.set(item.url, html);
+              await saveHtmlPage(options.output, item.url, html, htmlIndex);
 
               const links = await collectLinks(page, seedUrl);
               for (const link of links) {
@@ -239,9 +273,10 @@ export async function crawlSite(options: CrawlerOptions, logger: Logger): Promis
 
   await ensureDir(options.output);
   await writeJson(manifestPath, manifest);
+  await writeHtmlIndex(options.output, htmlIndex);
   logger.info(`Wrote ${manifest.pages.length} pages to pages.json`);
 
-  return { manifest, htmlByUrl };
+  return { manifest, htmlByUrl, seedMissing };
 }
 
 async function hydratePageHtml(page: Page): Promise<string> {
@@ -290,6 +325,7 @@ async function collectLinks(page: Page, seedUrl: string): Promise<string[]> {
     if (!absolute) continue;
     if (!isInternalLink(absolute, seedUrl)) continue;
     if (isAssetUrl(absolute)) continue;
+    if (isLowValueCrawlUrl(absolute)) continue;
     results.add(normalizeUrl(absolute));
   }
   return [...results];

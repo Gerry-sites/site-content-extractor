@@ -43,11 +43,13 @@ Only use this for sites you own or are authorized to migrate.
 
 ## Validation exit code 2
 
-The crawl finished but Markdown validation found errors (missing title/slug/image). Open `report.md` and fix the listed files, or re-run after improving the extractor.
+The crawl finished but Markdown validation or **coverage** found errors (missing HTML, missing images, leftover remote thumbs, missing title/slug). Open `report.md` → Coverage and fix, or re-run with `--resume` to fill holes.
 
 ## Wix pages look incomplete
 
-Wix hydrates late. The crawler waits for `networkidle` then `--settle-ms` (default 2500). Increase `--settle-ms` for stubborn Pro Galleries. The crawler also injects `img.currentSrc` and resource URLs into the HTML the extractor sees.
+Wix hydrates late. The crawler waits for `networkidle`, then `--settle-ms` (default 2500), clicks Load more, scrolls, and waits until image counts stabilize. Increase `--settle-ms` or `--timeout` for stubborn Pro Galleries. Image fetches send a `Referer` of the seed origin.
+
+`--resume` only recrawls pages that still have no HTML in `html-index.json`.
 
 ## Sharp install issues on Windows
 

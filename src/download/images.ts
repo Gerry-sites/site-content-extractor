@@ -42,6 +42,7 @@ export async function downloadImages(
     resume?: boolean;
     generateResponsive?: boolean;
     skipProcess?: boolean;
+    referer?: string;
   },
   logger: Logger,
 ): Promise<ImageDownloadResult> {
@@ -69,25 +70,39 @@ export async function downloadImages(
       };
       hashToFile.set(entry.hash, downloaded);
       byRemoteUrl.set(entry.remoteUrl, downloaded);
+      const upgraded = upgradeMediaUrl(entry.remoteUrl);
+      if (!byRemoteUrl.has(upgraded)) {
+        byRemoteUrl.set(upgraded, { ...downloaded, remoteUrl: upgraded });
+      }
       usedNames.add(path.basename(entry.relativePath));
     }
     logger.info(`Resumed ${byRemoteUrl.size} images from manifest`);
   }
 
-  const uniqueUrls = [
-    ...new Set(
-      urls
-        .filter(Boolean)
-        .filter((url) => !isSkippableAsset(url))
-        .map((url) => upgradeMediaUrl(url)),
-    ),
-  ];
+  const originals = urls.filter(Boolean).filter((url) => !isSkippableAsset(url));
+  const originalsFor = new Map<string, string[]>();
+  for (const original of originals) {
+    const upgraded = upgradeMediaUrl(original);
+    const list = originalsFor.get(upgraded) ?? [];
+    list.push(original);
+    originalsFor.set(upgraded, list);
+  }
+  const uniqueUrls = [...originalsFor.keys()];
   const limit = pLimit(options.concurrency ?? 4);
+  const referer = options.referer;
 
   await Promise.all(
     uniqueUrls.map((remoteUrl) =>
       limit(async () => {
-        if (byRemoteUrl.has(remoteUrl)) return;
+        if (byRemoteUrl.has(remoteUrl)) {
+          const existing = byRemoteUrl.get(remoteUrl)!;
+          for (const original of originalsFor.get(remoteUrl) ?? []) {
+            if (!byRemoteUrl.has(original)) {
+              byRemoteUrl.set(original, { ...existing, remoteUrl: original });
+            }
+          }
+          return;
+        }
 
         try {
           let res: Response | undefined;
@@ -100,6 +115,7 @@ export async function downloadImages(
                     options.userAgent ??
                     "site-migrate/0.1 (+https://github.com/site-migrate/site-migrate)",
                   Accept: "image/*,*/*",
+                  ...(referer ? { Referer: referer } : {}),
                 },
                 signal: AbortSignal.timeout(90_000),
                 redirect: "follow",
@@ -134,6 +150,11 @@ export async function downloadImages(
               ...existing,
               remoteUrl,
             });
+            for (const original of originalsFor.get(remoteUrl) ?? []) {
+              if (!byRemoteUrl.has(original)) {
+                byRemoteUrl.set(original, { ...existing, remoteUrl: original });
+              }
+            }
             logger.debug(`Deduped image: ${remoteUrl} -> ${existing.relativePath}`);
             return;
           }
@@ -167,6 +188,11 @@ export async function downloadImages(
           };
           hashToFile.set(hash, downloaded);
           byRemoteUrl.set(remoteUrl, downloaded);
+          for (const original of originalsFor.get(remoteUrl) ?? []) {
+            if (!byRemoteUrl.has(original)) {
+              byRemoteUrl.set(original, { ...downloaded, remoteUrl: original });
+            }
+          }
           logger.debug(`Downloaded image: ${filename}`);
         } catch (err) {
           broken.push(remoteUrl);

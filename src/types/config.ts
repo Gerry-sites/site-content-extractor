@@ -27,8 +27,8 @@ export const CliOptionsSchema = z.object({
     ])
     .default("auto"),
   respectRobots: z.boolean().default(true),
-  concurrency: z.number().int().positive().default(3),
-  timeoutMs: z.number().int().positive().default(30_000),
+  concurrency: z.number().int().positive().default(2),
+  timeoutMs: z.number().int().positive().default(90_000),
   settleMs: z.number().int().nonnegative().default(2_500),
   paths: z.array(z.string()).default(["/about", "/contact"]),
   generateResponsive: z.boolean().default(false),

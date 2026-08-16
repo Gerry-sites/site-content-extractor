@@ -18,6 +18,9 @@ import { createLogger } from "../utils/log.js";
 import { uniqueSlug } from "../utils/slug.js";
 import { assignSiteImagePaths } from "../pack/assign.js";
 import { reviewExtractedPages } from "../review/images.js";
+import { buildCoverage, coverageHasHoles } from "../pack/coverage.js";
+import { removeOrphanMarkdown } from "../pack/orphans.js";
+import { upgradeMediaUrl } from "../media/urls.js";
 
 export type MigrationResult = {
   report: MigrationReport;
@@ -49,7 +52,7 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
   logger.info(`Output: ${outputDir}`);
 
   // 1. Crawl
-  const { manifest, htmlByUrl } = await crawlSite(
+  const { manifest, htmlByUrl, seedMissing } = await crawlSite(
     {
       url: options.url,
       output: outputDir,
@@ -97,7 +100,14 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
   for (const page of manifest.pages) {
     const html = htmlByUrl.get(page.normalizedUrl);
     if (!html) {
-      warnings.push(`No HTML captured for ${page.normalizedUrl}`);
+      const extraSeed404 =
+        page.source === "seed" &&
+        page.normalizedUrl !== manifest.seedUrl &&
+        page.status !== undefined &&
+        page.status >= 400;
+      if (!extraSeed404) {
+        warnings.push(`No HTML captured for ${page.normalizedUrl}`);
+      }
       if (page.status && page.status >= 400) {
         brokenLinks.push(page.normalizedUrl);
       }
@@ -159,6 +169,7 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
         userAgent: options.userAgent,
         resume: options.resume,
         generateResponsive: options.generateResponsive,
+        referer: `${new URL(manifest.seedUrl).origin}/`,
       },
       logger,
     );
@@ -189,6 +200,7 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
     );
     for (const [remote, sitePath] of organized) {
       imagePathMap.set(remote, sitePath);
+      imagePathMap.set(upgradeMediaUrl(remote), sitePath);
     }
   }
 
@@ -196,14 +208,24 @@ export async function runMigration(options: CliOptions): Promise<MigrationResult
   await writeJson(path.join(outputDir, "image-review.json"), review);
 
   // 5. Generate markdown
+  const writtenByUrl = new Map<string, string>();
+  const markdownContents: string[] = [];
   if (options.markdown) {
+    const keep = new Set<string>();
     for (const page of extractedPages) {
       const md = generateMarkdown(page, imagePathMap, {
         skipBlog: options.skipBlog,
       });
       const outPath = path.join(outputDir, md.relativePath);
       await writeText(outPath, md.content);
+      writtenByUrl.set(page.url, md.relativePath);
+      keep.add(md.relativePath.replace(/\\/g, "/"));
+      markdownContents.push(md.content);
       logger.debug(`Wrote ${md.relativePath}`);
+    }
+    const removed = await removeOrphanMarkdown(outputDir, keep);
+    for (const rel of removed) {
+      logger.info(`Removed orphan Markdown ${rel}`);
     }
   }
 
@@ -258,10 +280,43 @@ export const collections = { pages, blog };
 `,
   );
 
+  const coverage = buildCoverage({
+    pages: manifest.pages,
+    htmlByUrl,
+    extracted: extractedPages,
+    writtenByUrl,
+    imagePathMap,
+    brokenImages,
+    markdownContents,
+    seedMissing,
+    skipImages: options.skipImages || !options.images,
+  });
+
   // 7. Validate
   const validation = await validateOutput(outputDir);
   for (const issue of validation.issues) {
     warnings.push(`[${issue.level}] ${issue.file}: ${issue.message}`);
+  }
+  if (coverage.missingHtml.length) {
+    warnings.push(`[error] Coverage: missing HTML for ${coverage.missingHtml.length} URL(s)`);
+  }
+  if (coverage.missingMarkdown.length) {
+    warnings.push(
+      `[error] Coverage: missing Markdown for ${coverage.missingMarkdown.length} page(s)`,
+    );
+  }
+  if (coverage.missingImages.length) {
+    warnings.push(
+      `[error] Coverage: missing ${coverage.missingImages.length} content image download(s)`,
+    );
+  }
+  if (coverage.leftoverRemote.length) {
+    warnings.push(
+      `[error] Coverage: ${coverage.leftoverRemote.length} remote content image(s) remain in Markdown`,
+    );
+  }
+  for (const seed of coverage.seedMissing) {
+    warnings.push(`Extra seed ${seed.path} returned HTTP ${seed.status ?? "?"}`);
   }
 
   const missingMetadata: string[] = [];
@@ -312,6 +367,7 @@ export const collections = { pages, blog };
     missingMetadata,
     warnings,
     recommendations,
+    coverage,
   };
 
   await writeJson(path.join(outputDir, "report.json"), report);
@@ -324,12 +380,13 @@ export const collections = { pages, blog };
   logger.info(`  Images:       ${report.images}`);
   logger.info(`  Broken Images:${report.brokenImages.length}`);
   logger.info(`  Warnings:     ${report.warnings.length}`);
+  logger.info(`  Coverage:     ${coverage.withHtml}/${coverage.discovered} HTML`);
   logger.info(`  Output:       ${outputDir}`);
 
   return {
     report,
     outputDir,
     platform: extractor.name,
-    validationOk: validation.ok,
+    validationOk: validation.ok && !coverageHasHoles(coverage),
   };
 }

@@ -2,7 +2,7 @@ import type { ExtractedPage, Frontmatter } from "../types/schemas.js";
 import { htmlToMarkdown } from "./turndown.js";
 import { serializeMarkdownFile } from "./frontmatter.js";
 import { MISSING_DATE, packFolder, type PackFolder } from "../pack/paths.js";
-import { upgradeMediaUrl } from "../media/urls.js";
+import { stripSkippableImages, upgradeMediaUrl } from "../media/urls.js";
 
 export type MarkdownResult = {
   filename: string;
@@ -44,7 +44,8 @@ export function generateMarkdown(
   imagePaths: ImagePathMap,
   options: { skipBlog?: boolean } = {},
 ): MarkdownResult {
-  const html = applyImagePaths(page.htmlContent, imagePaths);
+  const cleaned = stripSkippableImages(page.htmlContent);
+  const html = applyImagePaths(cleaned, imagePaths);
 
   let body = htmlToMarkdown(html);
   body = applyImagePaths(body, imagePaths);
@@ -53,7 +54,7 @@ export function generateMarkdown(
 
   const galleryLocals =
     page.galleries[0]?.images
-      .map((src) => imagePaths.get(src))
+      .map((src) => imagePaths.get(src) || imagePaths.get(upgradeMediaUrl(src)))
       .filter((x): x is string => Boolean(x)) ?? [];
 
   if (galleryLocals.length >= 3) {
@@ -81,16 +82,21 @@ export function generateMarkdown(
     body += "\n";
   }
 
-  const heroLocal = page.heroImage ? imagePaths.get(page.heroImage) : undefined;
+  const heroLocal =
+    (page.heroImage && (imagePaths.get(page.heroImage) || imagePaths.get(upgradeMediaUrl(page.heroImage)))) ||
+    undefined;
 
   const frontmatter: Frontmatter = {
     title: page.title || "Untitled",
     description: fallbackDescription(page),
     slug: page.slug,
-    date: fallbackDate(page),
     sourceUrl: page.url,
     heroImage: heroLocal || undefined,
   };
+
+  if (folder !== "pages") {
+    frontmatter.date = fallbackDate(page);
+  }
 
   if (page.isBlogPost && page.blog && !options.skipBlog) {
     frontmatter.author = page.blog.author;
