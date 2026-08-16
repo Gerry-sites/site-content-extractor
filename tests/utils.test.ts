@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  isInternalLink,
-  normalizeUrl,
-  pathFromUrl,
-  isImageUrl,
-} from "../src/utils/url.js";
+import { isInternalLink, normalizeUrl, pathFromUrl, isImageUrl } from "../src/utils/url.js";
 import { sanitizeFilename, toSlug, uniqueSlug } from "../src/utils/slug.js";
 import { sha256, shortHash } from "../src/utils/hash.js";
 
@@ -13,22 +8,14 @@ describe("url utils", () => {
     expect(normalizeUrl("https://Example.com/About/?utm_source=x#hash")).toBe(
       "https://example.com/About",
     );
-    expect(normalizeUrl("https://example.com/a/?b=2&a=1")).toBe(
-      "https://example.com/a?a=1&b=2",
-    );
+    expect(normalizeUrl("https://example.com/a/?b=2&a=1")).toBe("https://example.com/a?a=1&b=2");
   });
 
   it("detects internal links", () => {
     expect(isInternalLink("/about", "https://example.com")).toBe(true);
-    expect(isInternalLink("https://example.com/x", "https://example.com")).toBe(
-      true,
-    );
-    expect(isInternalLink("https://other.com/x", "https://example.com")).toBe(
-      false,
-    );
-    expect(isInternalLink("mailto:hi@example.com", "https://example.com")).toBe(
-      false,
-    );
+    expect(isInternalLink("https://example.com/x", "https://example.com")).toBe(true);
+    expect(isInternalLink("https://other.com/x", "https://example.com")).toBe(false);
+    expect(isInternalLink("mailto:hi@example.com", "https://example.com")).toBe(false);
   });
 
   it("derives path slugs from URLs", () => {

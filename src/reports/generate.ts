@@ -26,6 +26,10 @@ export function buildReportMarkdown(report: MigrationReport): string {
     `| Broken Links | ${report.brokenLinks.length} |`,
     `| Missing Metadata | ${report.missingMetadata.length} |`,
     "",
+    "## Review",
+    "",
+    "See `image-review.json` for per-image flags (chrome, other-host, title-name-in-media, inline-blog).",
+    "",
   ];
 
   if (report.brokenImages.length) {
@@ -61,10 +65,7 @@ export function buildReportMarkdown(report: MigrationReport): string {
   return lines.join("\n");
 }
 
-export async function writeReport(
-  outputDir: string,
-  report: MigrationReport,
-): Promise<string> {
+export async function writeReport(outputDir: string, report: MigrationReport): Promise<string> {
   const content = buildReportMarkdown(report);
   const filePath = path.join(outputDir, "report.md");
   await writeText(filePath, content);

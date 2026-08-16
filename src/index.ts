@@ -4,6 +4,8 @@ export { detectPlatform } from "./detect/platform.js";
 export { listExtractors, getExtractor, registerExtractor } from "./extractors/registry.js";
 export type { PlatformExtractor, ExtractionContext } from "./extractors/types.js";
 export { generateMarkdown } from "./markdown/generate.js";
+export { importPacks } from "./import/astro.js";
+export { upgradeMediaUrl, isSkippableAsset } from "./media/urls.js";
 export { downloadImages } from "./download/images.js";
 export { validateOutput } from "./validate/markdown.js";
 export { CliOptionsSchema } from "./types/config.js";

@@ -66,9 +66,7 @@ export function removeChrome($: cheerio.CheerioAPI): void {
   }
 }
 
-export function selectMainContent(
-  $: cheerio.CheerioAPI,
-): cheerio.Cheerio<AnyNode> {
+export function selectMainContent($: cheerio.CheerioAPI): cheerio.Cheerio<AnyNode> {
   for (const selector of MAIN_CANDIDATES) {
     const el = $(selector).first();
     if (el.length && el.text().trim().length > 40) {

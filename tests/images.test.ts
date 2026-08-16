@@ -28,10 +28,7 @@ describe("image downloading", () => {
 
     try {
       const result = await downloadImages(
-        [
-          "https://cdn.example.com/a/photo.png",
-          "https://cdn.example.com/b/photo-copy.png",
-        ],
+        ["https://cdn.example.com/a/photo.png", "https://cdn.example.com/b/photo-copy.png"],
         dir,
         { skipProcess: true, concurrency: 2 },
         createLogger(false),
@@ -44,9 +41,7 @@ describe("image downloading", () => {
       expect(hashes.size).toBe(1);
       expect(result.images[0]?.hash).toBe(sha256(png));
 
-      const saved = await readFile(
-        path.join(dir, result.images[0]!.relativePath),
-      );
+      const saved = await readFile(path.join(dir, result.images[0]!.relativePath));
       expect(saved.equals(png)).toBe(true);
     } finally {
       globalThis.fetch = originalFetch;
@@ -56,8 +51,7 @@ describe("image downloading", () => {
   it("records broken images instead of throwing", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "site-migrate-"));
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () =>
-      new Response("missing", { status: 404 })) as typeof fetch;
+    globalThis.fetch = (async () => new Response("missing", { status: 404 })) as typeof fetch;
 
     try {
       const result = await downloadImages(
@@ -67,6 +61,31 @@ describe("image downloading", () => {
         createLogger(false),
       );
       expect(result.broken).toContain("https://cdn.example.com/missing.jpg");
+      expect(result.images).toHaveLength(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("does not fetch skippable Wix chrome icons", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "site-migrate-"));
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls += 1;
+      return new Response("nope", { status: 200 });
+    }) as typeof fetch;
+
+    try {
+      const result = await downloadImages(
+        [
+          "https://static.wixstatic.com/media/ce6ec7c11b174c0581e20f42bb865ce3.png/v1/fill/w_18,h_18,al_c,q_85/ce6ec7c11b174c0581e20f42bb865ce3.png",
+        ],
+        dir,
+        { skipProcess: true },
+        createLogger(false),
+      );
+      expect(calls).toBe(0);
       expect(result.images).toHaveLength(0);
     } finally {
       globalThis.fetch = originalFetch;

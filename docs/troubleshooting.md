@@ -25,7 +25,7 @@ site-migrate https://example.com --resume
 
 Common causes:
 
-- Heavy client-side rendering — try `--no-headless` and increase wait via code if needed
+- Heavy client-side rendering — try `--no-headless` and `--settle-ms 5000`
 - Wrong extractor — force `--platform=wix` (or another) when auto-detect is wrong
 - Content lives outside `<main>` — extend the platform extractor’s container selectors
 
@@ -47,7 +47,7 @@ The crawl finished but Markdown validation found errors (missing title/slug/imag
 
 ## Wix pages look incomplete
 
-Wix hydrates late. The crawler waits for `networkidle` briefly; for stubborn pages, increase the settle delay in `src/crawler/index.ts` or contribute Wix-specific waits in the Wix extractor.
+Wix hydrates late. The crawler waits for `networkidle` then `--settle-ms` (default 2500). Increase `--settle-ms` for stubborn Pro Galleries. The crawler also injects `img.currentSrc` and resource URLs into the HTML the extractor sees.
 
 ## Sharp install issues on Windows
 
@@ -57,6 +57,6 @@ Ensure build tools are available, or reinstall:
 npm rebuild sharp
 ```
 
-## `--platform=wordpress` (or other reserved id) fails
+## `--platform=ghost` (or other reserved id) fails
 
-Those ids are reserved in the CLI schema but do not have registered extractors yet. Use `--platform=auto` or an implemented value (`generic`, `wix`, `webflow`, `squarespace`), or [add a plugin](plugins.md).
+Those ids are reserved in the CLI schema but do not have registered extractors yet. Use `--platform=auto` or an implemented value (`generic`, `wix`, `wordpress`, `webflow`, `squarespace`), or [add a plugin](plugins.md).

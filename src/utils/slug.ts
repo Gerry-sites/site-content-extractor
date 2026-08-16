@@ -16,7 +16,7 @@ export function toSlug(input: string, fallback = "page"): string {
 }
 
 export function uniqueSlug(base: string, used: Set<string>): string {
-  let candidate = toSlug(base);
+  const candidate = toSlug(base);
   if (!used.has(candidate)) {
     used.add(candidate);
     return candidate;

@@ -43,7 +43,7 @@ Each extractor implements:
 type PlatformExtractor = {
   id: PlatformId;
   name: string;
-  detect(ctx): number;          // 0–1 confidence
+  detect(ctx): number; // 0–1 confidence
   extractPage(ctx): ExtractedPage;
   extractNavigation?(ctx);
   extractMetadata?(ctx);

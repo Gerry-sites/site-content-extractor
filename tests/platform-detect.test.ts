@@ -40,6 +40,17 @@ describe("platform detection", () => {
     expect(result.confidence).toBeGreaterThan(0.35);
   });
 
+  it("detects WordPress", async () => {
+    const html = readFileSync(path.join(fixtures, "wordpress.html"), "utf8");
+    const result = await detectPlatform({
+      url: "https://blog.example.com/",
+      html,
+      seedUrl: "https://blog.example.com/",
+    });
+    expect(result.platform).toBe("wordpress");
+    expect(result.confidence).toBeGreaterThan(0.35);
+  });
+
   it("falls back to generic for plain HTML", async () => {
     const html = readFileSync(path.join(fixtures, "sample.html"), "utf8");
     const result = await detectPlatform({

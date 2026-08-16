@@ -20,9 +20,7 @@ export function normalizeUrl(input: string, base?: string): string {
     url.searchParams.delete(key);
   }
   // Sort remaining params for determinism
-  const entries = [...url.searchParams.entries()].sort(([a], [b]) =>
-    a.localeCompare(b),
-  );
+  const entries = [...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
   url.search = "";
   for (const [k, v] of entries) {
     url.searchParams.append(k, v);
@@ -66,7 +64,7 @@ export function toAbsoluteUrl(href: string, base: string): string | null {
 
 export function pathFromUrl(url: string): string {
   const parsed = new URL(url);
-  let path = parsed.pathname;
+  const path = parsed.pathname;
   if (!path || path === "/") return "home";
   return path.replace(/^\/+|\/+$/g, "");
 }

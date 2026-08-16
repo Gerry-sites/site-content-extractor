@@ -9,11 +9,7 @@ describe("robots.txt loader", () => {
         { status: 200 },
       )) as typeof fetch;
 
-    const robots = await loadRobots(
-      "https://example.com",
-      "site-migrate/0.1",
-      fetchImpl,
-    );
+    const robots = await loadRobots("https://example.com", "site-migrate/0.1", fetchImpl);
 
     expect(robots.isAllowed("https://example.com/about")).toBe(true);
     expect(robots.isAllowed("https://example.com/private/secret")).toBe(false);
@@ -21,14 +17,9 @@ describe("robots.txt loader", () => {
   });
 
   it("allows everything when robots.txt is missing", async () => {
-    const fetchImpl = (async () =>
-      new Response("missing", { status: 404 })) as typeof fetch;
+    const fetchImpl = (async () => new Response("missing", { status: 404 })) as typeof fetch;
 
-    const robots = await loadRobots(
-      "https://example.com",
-      "site-migrate/0.1",
-      fetchImpl,
-    );
+    const robots = await loadRobots("https://example.com", "site-migrate/0.1", fetchImpl);
 
     expect(robots.isAllowed("https://example.com/anything")).toBe(true);
     expect(robots.sitemaps[0]).toBe("https://example.com/sitemap.xml");

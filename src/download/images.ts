@@ -9,6 +9,7 @@ import { sanitizeFilename } from "../utils/slug.js";
 import { sha256, shortHash } from "../utils/hash.js";
 import { processImage } from "../images/process.js";
 import type { Logger } from "../utils/log.js";
+import { isSkippableAsset, upgradeMediaUrl } from "../media/urls.js";
 
 export type DownloadedImage = {
   remoteUrl: string;
@@ -73,7 +74,14 @@ export async function downloadImages(
     logger.info(`Resumed ${byRemoteUrl.size} images from manifest`);
   }
 
-  const uniqueUrls = [...new Set(urls.filter(Boolean))];
+  const uniqueUrls = [
+    ...new Set(
+      urls
+        .filter(Boolean)
+        .filter((url) => !isSkippableAsset(url))
+        .map((url) => upgradeMediaUrl(url)),
+    ),
+  ];
   const limit = pLimit(options.concurrency ?? 4);
 
   await Promise.all(
@@ -82,16 +90,29 @@ export async function downloadImages(
         if (byRemoteUrl.has(remoteUrl)) return;
 
         try {
-          const res = await fetch(remoteUrl, {
-            headers: {
-              "User-Agent":
-                options.userAgent ??
-                "site-migrate/0.1 (+https://github.com/site-migrate/site-migrate)",
-              Accept: "image/*,*/*",
-            },
-            signal: AbortSignal.timeout(45_000),
-            redirect: "follow",
-          });
+          let res: Response | undefined;
+          let lastFetchError: unknown;
+          for (let attempt = 1; attempt <= 2; attempt += 1) {
+            try {
+              res = await fetch(remoteUrl, {
+                headers: {
+                  "User-Agent":
+                    options.userAgent ??
+                    "site-migrate/0.1 (+https://github.com/site-migrate/site-migrate)",
+                  Accept: "image/*,*/*",
+                },
+                signal: AbortSignal.timeout(90_000),
+                redirect: "follow",
+              });
+              lastFetchError = undefined;
+              break;
+            } catch (err) {
+              lastFetchError = err;
+              if (attempt === 2) throw err;
+              await new Promise((r) => setTimeout(r, 1_500));
+            }
+          }
+          if (!res) throw lastFetchError ?? new Error("image fetch failed");
 
           if (!res.ok) {
             broken.push(remoteUrl);
@@ -128,9 +149,7 @@ export async function downloadImages(
               const processed = await processImage(localPath, imagesDir, {
                 generateResponsive: options.generateResponsive,
               });
-              thumbRelativePath = path
-                .relative(outputDir, processed.thumbPath)
-                .replace(/\\/g, "/");
+              thumbRelativePath = path.relative(outputDir, processed.thumbPath).replace(/\\/g, "/");
             } catch (err) {
               logger.debug(
                 `Image process skipped for ${filename}: ${err instanceof Error ? err.message : String(err)}`,
@@ -218,28 +237,19 @@ function extFromContentType(contentType: string): string | null {
 function sniffExt(buffer: Buffer): string | null {
   if (buffer.length < 4) return null;
   if (buffer[0] === 0xff && buffer[1] === 0xd8) return "jpg";
-  if (
-    buffer[0] === 0x89 &&
-    buffer[1] === 0x50 &&
-    buffer[2] === 0x4e &&
-    buffer[3] === 0x47
-  ) {
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
     return "png";
   }
-  if (
-    buffer[0] === 0x47 &&
-    buffer[1] === 0x49 &&
-    buffer[2] === 0x46
-  ) {
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
     return "gif";
   }
-  if (
-    buffer.toString("ascii", 0, 4) === "RIFF" &&
-    buffer.toString("ascii", 8, 12) === "WEBP"
-  ) {
+  if (buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") {
     return "webp";
   }
-  if (buffer.toString("utf8", 0, 5).includes("<svg") || buffer.toString("utf8", 0, 100).includes("<svg")) {
+  if (
+    buffer.toString("utf8", 0, 5).includes("<svg") ||
+    buffer.toString("utf8", 0, 100).includes("<svg")
+  ) {
     return "svg";
   }
   return null;

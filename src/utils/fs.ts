@@ -1,11 +1,4 @@
-import {
-  access,
-  mkdir,
-  readFile,
-  writeFile,
-  rm,
-  copyFile,
-} from "node:fs/promises";
+import { access, mkdir, readFile, writeFile, rm, copyFile } from "node:fs/promises";
 import path from "node:path";
 
 export async function ensureDir(dir: string): Promise<void> {
@@ -21,11 +14,7 @@ export async function exists(filePath: string): Promise<boolean> {
   }
 }
 
-export async function writeJson(
-  filePath: string,
-  data: unknown,
-  pretty = true,
-): Promise<void> {
+export async function writeJson(filePath: string, data: unknown, pretty = true): Promise<void> {
   await ensureDir(path.dirname(filePath));
   const body = pretty ? JSON.stringify(data, null, 2) + "\n" : JSON.stringify(data);
   await writeFile(filePath, body, "utf8");

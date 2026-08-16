@@ -2,10 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import * as cheerio from "cheerio";
-import {
-  extractBlogMeta,
-  looksLikeBlogPost,
-} from "../src/extractors/shared/blog.js";
+import { extractBlogMeta, looksLikeBlogPost } from "../src/extractors/shared/blog.js";
 import { genericExtractor } from "../src/extractors/generic/index.js";
 import { generateMarkdown } from "../src/markdown/generate.js";
 import { parseFrontmatter } from "../src/markdown/frontmatter.js";
@@ -17,9 +14,7 @@ describe("blog detection", () => {
     const html = readFileSync(path.join(fixtures, "blog.html"), "utf8");
     const $ = cheerio.load(html);
 
-    expect(
-      looksLikeBlogPost("https://example.com/blog/shipping-faster", $),
-    ).toBe(true);
+    expect(looksLikeBlogPost("https://example.com/blog/shipping-faster", $)).toBe(true);
     expect(looksLikeBlogPost("https://example.com/about", $)).toBe(true);
   });
 
@@ -32,11 +27,7 @@ describe("blog detection", () => {
   it("extracts date, author, categories, and tags", () => {
     const html = readFileSync(path.join(fixtures, "blog.html"), "utf8");
     const $ = cheerio.load(html);
-    const meta = extractBlogMeta(
-      $,
-      "Shipping Faster",
-      "https://example.com/blog/shipping-faster",
-    );
+    const meta = extractBlogMeta($, "Shipping Faster", "https://example.com/blog/shipping-faster");
 
     expect(meta.date).toContain("2024-06-15");
     expect(meta.author).toBe("Ada Lovelace");
@@ -66,8 +57,6 @@ describe("blog detection", () => {
     expect(frontmatter.title).toBe("Shipping Faster");
     expect(frontmatter.author).toBe("Ada Lovelace");
     expect(frontmatter.date).toContain("2024-06-15");
-    expect(frontmatter.tags).toEqual(
-      expect.arrayContaining(["devops", "process"]),
-    );
+    expect(frontmatter.tags).toEqual(expect.arrayContaining(["devops", "process"]));
   });
 });

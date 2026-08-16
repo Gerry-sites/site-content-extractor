@@ -2,18 +2,22 @@
 
 Migrate publicly accessible websites into clean Markdown and structured assets suitable for [Astro Content Collections](https://docs.astro.build/en/guides/content-collections/).
 
-The tool prioritizes **content extraction** over layout reproduction. Although Wix is a first-class target, the architecture is plugin-based so other platforms (Squarespace, Webflow, WordPress, and plain HTML) can be added without changing the crawler.
+The CLI is **`site-migrate <url>`** for any public origin. Per-site differences go through flags (`--platform`, `--paths`, `--settle-ms`, `--locale`). Nothing in `src/` is hardcoded to a client hostname.
+
+The tool prioritizes **content extraction** over layout reproduction. Plugins cover Wix, WordPress, Squarespace, Webflow, and plain HTML.
 
 ## Features
 
-- Playwright-based crawling with sitemap + navigation discovery
+- Playwright-based crawling with sitemap + navigation + REST/feed discovery
+- JS gallery hydration (`img.currentSrc`, Load more clicks, `--settle-ms`)
 - robots.txt respect (override available)
-- Platform auto-detection (`wix`, `webflow`, `squarespace`, `generic`)
-- Clean HTML → Markdown with YAML frontmatter
-- Image download, hash deduplication, thumbnails
-- Gallery + blog post detection
+- Platform auto-detection (`wix`, `wordpress`, `webflow`, `squarespace`, `generic`)
+- Clean HTML → Markdown with YAML frontmatter (`title`, `description`, `date`, `heroImage`, `gallery`)
+- Image download with Wix/WordPress URL upgrades, hash deduplication, thumbnails
+- `image-review.json` flags chrome / other-host / title-name illustrations
+- `site-migrate import` copies a pack into an Astro starter clone
 - `navigation.json`, `metadata.json`, `sitemap.json`, `report.md`
-- Output validation (titles, slugs, image refs)
+- Output validation (titles, descriptions, dates, image refs)
 
 ## Requirements
 
@@ -58,8 +62,13 @@ output/
   blog/
     first-post.md
   portfolio/
+    gallery.md
   images/
+    portfolio/
+    blog/
+    pages/
     thumbs/
+  image-review.json
   navigation.json
   sitemap.json
   metadata.json
@@ -71,23 +80,34 @@ output/
 
 ```bash
 site-migrate <url> [options]
+site-migrate import <pack...> --target <astro-clone>
 ```
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `--output <dir>` | `output` | Output directory |
-| `--depth <n>` | `10` | Max crawl depth |
-| `--platform <name>` | `auto` | `auto`, `generic`, `wix`, `webflow`, `squarespace`, … |
-| `--headless` / `--no-headless` | headless | Browser mode |
-| `--resume` | off | Resume from existing `pages.json` / image manifest |
-| `--overwrite` | off | Replace existing output directory |
-| `--skip-images` | off | Skip image downloads |
-| `--skip-blog` | off | Do not classify pages as blog posts |
-| `--no-respect-robots` | off | Ignore robots.txt |
-| `--concurrency <n>` | `3` | Parallel crawl/download workers |
-| `--responsive-images` | off | Generate width variants with Sharp |
-| `--json-export` | off | Also write `content.json` |
-| `--verbose` | off | Debug logging |
+| Option                         | Default           | Description                                                        |
+| ------------------------------ | ----------------- | ------------------------------------------------------------------ |
+| `--output <dir>`               | `output`          | Output directory                                                   |
+| `--depth <n>`                  | `10`              | Max crawl depth                                                    |
+| `--platform <name>`            | `auto`            | `auto`, `generic`, `wix`, `wordpress`, `webflow`, `squarespace`, … |
+| `--paths <list>`               | `/about,/contact` | Extra seed paths (comma-separated)                                 |
+| `--settle-ms <n>`              | `2500`            | Wait after `networkidle` so JS galleries hydrate                   |
+| `--headless` / `--no-headless` | headless          | Browser mode                                                       |
+| `--resume`                     | off               | Resume from existing `pages.json` / image manifest                 |
+| `--overwrite`                  | off               | Replace existing output directory                                  |
+| `--skip-images`                | off               | Skip image downloads                                               |
+| `--skip-blog`                  | off               | Do not classify pages as blog posts                                |
+| `--no-respect-robots`          | off               | Ignore robots.txt                                                  |
+| `--concurrency <n>`            | `3`               | Parallel crawl/download workers                                    |
+| `--responsive-images`          | off               | Generate width variants with Sharp                                 |
+| `--json-export`                | off               | Also write `content.json`                                          |
+| `--verbose`                    | off               | Debug logging                                                      |
+
+### Import into an Astro clone
+
+```bash
+site-migrate import ./output --target /path/to/astro-clone --locale en
+```
+
+`--target` is required. Protected pages (`home`, `about`, `contact`) are not overwritten unless `--overwrite-pages`. Flagged images stay out of `public/images/` unless `--include-flagged`.
 
 ## Documentation
 

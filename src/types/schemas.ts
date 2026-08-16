@@ -111,6 +111,7 @@ export const ExtractedPageSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   slug: z.string(),
+  date: z.string().optional(),
   headings: z.array(z.string()).default([]),
   htmlContent: z.string(),
   textContent: z.string().optional(),
@@ -136,6 +137,7 @@ export const FrontmatterSchema = z.object({
   tags: z.array(z.string()).optional(),
   gallery: z.array(z.string()).optional(),
   draft: z.boolean().optional(),
+  sourceUrl: z.string().optional(),
 });
 
 export const MigrationReportSchema = z.object({

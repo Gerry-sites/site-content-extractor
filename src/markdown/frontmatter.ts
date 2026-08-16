@@ -5,10 +5,7 @@ export function buildFrontmatter(input: Frontmatter): Frontmatter {
   return FrontmatterSchema.parse(input);
 }
 
-export function serializeMarkdownFile(
-  frontmatter: Frontmatter,
-  body: string,
-): string {
+export function serializeMarkdownFile(frontmatter: Frontmatter, body: string): string {
   const validated = buildFrontmatter(frontmatter);
   const yamlBlock = yaml
     .dump(validated, {
@@ -31,6 +28,8 @@ export function parseFrontmatter(markdown: string): {
   if (!match) {
     return { frontmatter: {}, body: markdown };
   }
-  const frontmatter = (yaml.load(match[1]!) as Record<string, unknown>) ?? {};
+  // CORE_SCHEMA keeps ISO dates as strings (DEFAULT_SCHEMA would parse 1970-01-01 as Date).
+  const frontmatter =
+    (yaml.load(match[1]!, { schema: yaml.CORE_SCHEMA }) as Record<string, unknown>) ?? {};
   return { frontmatter, body: match[2] ?? "" };
 }

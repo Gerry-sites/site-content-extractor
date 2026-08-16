@@ -36,14 +36,7 @@ describe("sitemap XML parser", () => {
       );
     }) as typeof fetch;
 
-    const urls = await fetchSitemapUrls(
-      "https://example.com/sitemap.xml",
-      "test-agent",
-      fetchImpl,
-    );
-    expect(urls).toEqual([
-      "https://example.com/a",
-      "https://example.com/b",
-    ]);
+    const urls = await fetchSitemapUrls("https://example.com/sitemap.xml", "test-agent", fetchImpl);
+    expect(urls).toEqual(["https://example.com/a", "https://example.com/b"]);
   });
 });

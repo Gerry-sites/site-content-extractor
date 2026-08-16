@@ -16,13 +16,19 @@ import {
   pickHeroImage,
 } from "../shared/media.js";
 import { extractBlogMeta, looksLikeBlogPost } from "../shared/blog.js";
-import {
-  extractNavigation,
-  extractSiteMetadata,
-} from "../shared/metadata.js";
+import { extractNavigation, extractSiteMetadata } from "../shared/metadata.js";
 import { pathFromUrl } from "../../utils/url.js";
 import { toSlug } from "../../utils/slug.js";
 import type { ExtractedPage } from "../../types/schemas.js";
+
+function isInfoRoute(url: string): boolean {
+  try {
+    const path = new URL(url).pathname.replace(/\/+$/, "") || "/";
+    return /^\/(about|contact|bio|cv|press|privacy|legal)$/i.test(path);
+  } catch {
+    return false;
+  }
+}
 
 const WIX_HINTS = [
   "wix.com",
@@ -91,23 +97,29 @@ export const wixExtractor: PlatformExtractor = {
     let mainHtml = "";
     for (const selector of candidates) {
       const el = $(selector).first();
-      if (el.length && el.text().trim().length > 40) {
+      if (el.length && (el.text().trim().length > 40 || el.find("img").length >= 3)) {
         mainHtml = $.html(el) || "";
         break;
       }
     }
     if (!mainHtml) {
-      // Fall back to generic extractor content selection
       const generic = await genericExtractor.extractPage(ctx);
-      return { ...generic };
+      const info = isInfoRoute(ctx.url);
+      const imageHeavy = generic.images.length >= 4 || generic.galleries.length >= 1;
+      if (!info && imageHeavy && !generic.isBlogPost) {
+        if (!generic.galleries.length) {
+          generic.galleries = [{ images: generic.images.map((img) => img.src) }];
+        }
+        generic.kind = "gallery";
+      }
+      return generic;
     }
 
     const $main = loadDocument(`<div id="__main">${mainHtml}</div>`);
 
     // Promote Wix background images into <img> for markdown conversion
     $main("[data-src], [data-pin-media]").each((_, el) => {
-      const src =
-        $main(el).attr("data-src") || $main(el).attr("data-pin-media");
+      const src = $main(el).attr("data-src") || $main(el).attr("data-pin-media");
       if (src && !$main(el).attr("src")) {
         $main(el).attr("src", src);
       }
@@ -141,6 +153,12 @@ export const wixExtractor: PlatformExtractor = {
       $(".blog-post-content").length > 0;
 
     const slug = toSlug(pathFromUrl(ctx.url), "page");
+    const info = isInfoRoute(ctx.url);
+    const imageHeavy =
+      galleries.length >= 1 || mergedImages.length >= 4 || /1\s*\/\s*\d+/.test($main.text());
+    if (!galleries.length && imageHeavy && !info && !isBlog) {
+      galleries.push({ images: mergedImages.map((img) => img.src) });
+    }
 
     const page: ExtractedPage = {
       url: ctx.url,
@@ -157,7 +175,7 @@ export const wixExtractor: PlatformExtractor = {
       files,
       galleries,
       isBlogPost: isBlog,
-      kind: isBlog ? "blog" : galleries.length >= 1 && headings.length <= 1 ? "gallery" : "page",
+      kind: isBlog ? "blog" : info ? "page" : imageHeavy ? "gallery" : "page",
     };
 
     if (isBlog) {
@@ -166,6 +184,7 @@ export const wixExtractor: PlatformExtractor = {
         heroImage,
       };
       if (page.blog.slug) page.slug = page.blog.slug;
+      if (page.blog.date) page.date = page.blog.date;
     }
 
     return page;

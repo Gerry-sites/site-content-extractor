@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { genericExtractor } from "../src/extractors/generic/index.js";
 import { wixExtractor } from "../src/extractors/wix/index.js";
+import { wordpressExtractor } from "../src/extractors/wordpress/index.js";
 
 const fixtures = path.join(process.cwd(), "tests/fixtures");
 
@@ -59,5 +60,64 @@ describe("wix extractor", () => {
     expect(page.title).toContain("Wix");
     expect(page.htmlContent).toContain("Hello from Wix");
     expect(page.htmlContent).not.toContain("WIX_ADS");
+  });
+
+  it("treats image-heavy Pro Gallery pages as galleries and keeps about as a page", async () => {
+    const galleryHtml = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="generator" content="Wix.com Website Builder" />
+    <title>Works</title>
+    <script src="https://static.wixstatic.com/services.js"></script>
+  </head>
+  <body>
+    <div id="SITE_PAGES">
+      <div data-testid="pro-gallery">
+        <span>1 / 8</span>
+        <img src="https://static.wixstatic.com/media/v1/fill/w_290,h_290,al_c,q_80,usm_0.66_1.00_0.01,enc_auto/one.jpg" alt="One" />
+        <img src="https://static.wixstatic.com/media/v1/fill/w_290,h_290,al_c,q_80,usm_0.66_1.00_0.01,enc_auto/two.jpg" alt="Two" />
+        <img src="https://static.wixstatic.com/media/v1/fill/w_290,h_290,al_c,q_80,usm_0.66_1.00_0.01,enc_auto/three.jpg" alt="Three" />
+        <img src="https://static.wixstatic.com/media/v1/fill/w_290,h_290,al_c,q_80,usm_0.66_1.00_0.01,enc_auto/four.jpg" alt="Four" />
+      </div>
+    </div>
+  </body>
+</html>`;
+    const gallery = await wixExtractor.extractPage({
+      url: "https://studio.example.com/works",
+      html: galleryHtml,
+      seedUrl: "https://studio.example.com/",
+    });
+    expect(gallery.kind).toBe("gallery");
+    expect(gallery.images.length).toBeGreaterThanOrEqual(4);
+    expect(gallery.images.every((img) => img.src.includes("/v1/fit/w_1800"))).toBe(true);
+
+    const about = await wixExtractor.extractPage({
+      url: "https://studio.example.com/about",
+      html: readFileSync(path.join(fixtures, "wix.html"), "utf8"),
+      seedUrl: "https://studio.example.com/",
+    });
+    expect(about.kind).toBe("page");
+  });
+});
+
+describe("wordpress extractor", () => {
+  it("extracts entry-content and upgrades cropped media URLs", async () => {
+    const html = readFileSync(path.join(fixtures, "wordpress.html"), "utf8");
+    const score = await wordpressExtractor.detect({
+      url: "https://blog.example.com/2020/01/hello/",
+      html,
+      seedUrl: "https://blog.example.com/",
+    });
+    expect(score).toBeGreaterThan(0.5);
+
+    const page = await wordpressExtractor.extractPage({
+      url: "https://blog.example.com/2020/01/hello/",
+      html,
+      seedUrl: "https://blog.example.com/",
+    });
+    expect(page.kind).toBe("blog");
+    expect(page.htmlContent).toContain("bilingual recipe");
+    expect(page.images.some((img) => img.src.includes("dish.jpg"))).toBe(true);
+    expect(page.images.some((img) => /[?&]w=300/.test(img.src))).toBe(false);
   });
 });
